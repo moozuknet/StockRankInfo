@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>DEVELOPMENT GUIDE - 증시 시가총액 변동 분석 & 텔레그램 자동 발송</title>
+  <style>
+    body { font-family: monospace, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; line-height: 1.6; }
+    pre { white-space: pre-wrap; word-wrap: break-word; background: #1e293b; padding: 16px; border-radius: 8px; border: 1px solid #334155; }
+  </style>
+</head>
+<body>
+  <h1>🛠 DEVELOPMENT GUIDE - 증시 시가총액 변동 분석 & 텔레그램 자동 발송</h1>
+  <pre>
+# 🛠 개발 및 배포 가이드 (DEVELOPMENT GUIDE)
+
+본 문서는 Google Apps Script(GAS) 프로젝트 생성부터 텔레그램 봇 연동, Clasp CLI 배포, 미리보기 모달 및 시점별 애널리스트 요약 엔진에 대한 개발/유지보수 가이드입니다.
+
+---
+
+## 1. 📝 Google Apps Script 프로젝트 구성 및 Clasp CLI 자동화
+
+### 1) Clasp CLI를 이용한 로컬 코드 푸시 및 배포
+본 프로젝트는 `clasp` CLI를 통해 로컬 환경에서 온라인 GAS 프로젝트로 소스 코드를 즉시 업로드하고 버전을 배포할 수 있습니다.
+
+```bash
+# 1. 의존성 및 clasp 설치 확인
+npx clasp --version
+
+# 2. 로컬 코드 온라인 GAS 프로젝트로 강제 푸시 (.claspignore 자동 적용)
+npx clasp push --force
+
+# 3. 새로운 버전 생성 및 배포 (Production Web App)
+npx clasp deploy --description "v1.6 Release - Fix Rank Shift Jumps & Upload HTML Docs"
+
+# 4. 배포 목록 및 실행 URL 확인
+npx clasp deployments
+```
+
+### 2) `.clasp.json` 파일 구조
+```json
+{
+  "scriptId": "15e5lRqFYzYIiO-nYcg9zLPJKGRTxSv9tSSoZ_95gLQG8K4XvEjlWF0K9",
+  "rootDir": "."
+}
+```
+
+---
+
+## 2. 🤖 Telegram Bot 생성 및 Token / Chat ID 획득 절차
+
+1. `@BotFather`를 통해 Bot Token 생성.
+2. `@userinfobot` 또는 `getUpdates`를 통해 Chat ID 수집.
+3. Web UI 접속 후 `Bot Token` & `Chat ID` 등록 후 `[연동 테스트 발송]` 확인.
+
+---
+
+## 3. 🚀 백엔드 핵심 API 및 파싱 엔진 (`Code.gs`)
+
+1. **`previewReport(marketType)`**:
+   - 텔레그램 발송 전 실제 수집 데이터 기준 발송 메시지 및 렌더링 미리보기(모달 팝업) 지원.
+
+2. **`generateAnalystSummary(stockList, sessionTitle, config)` (v1.6+)**:
+   - 순위 변동폭(`rankShift = pastRank - currentRank`) 기준 순위 급등(▲계단) 및 급락(▼계단) 정밀 분석 요약.
+
+3. **`calculateHistoricalChanges(stockList, config)`**:
+   - 시총 1위 고정 종목(`005930`, `AAPL`, `NVDA`)의 과거 순위 1위 고정 예외 보정.
+  </pre>
+</body>
+</html>

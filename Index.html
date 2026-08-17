@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>증시 시가총액 변동 분석 & 텔레그램 알림 설정</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts: Inter & Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f6ff',
+              100: '#e0edff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#1e3a8a',
+            }
+          },
+          fontFamily: {
+            sans: ['Noto Sans KR', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+    
+    .glass-card {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    
+    .glass-card-hover {
+      transition: all 0.25s ease-in-out;
+    }
+    .glass-card-hover:hover {
+      border-color: rgba(59, 130, 246, 0.4);
+      transform: translateY(-2px);
+    }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-28 text-slate-100 antialiased">
+
+  <!-- Header Top Bar -->
+  <header class="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <i class="fa-solid fa-chart-line text-white text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight text-white">증시 시가총액 변동 분석</h1>
+            <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">GAS Bot v1.4</span>
+          </div>
+          <p class="text-xs text-slate-400">한국(KRX 정규/NXT) & 미국(US) 시총 상위 변동 분석 텔레그램 리포트</p>
+        </div>
+      </div>
+      
+      <!-- Status Badge -->
+      <div class="flex items-center gap-3">
+        <div id="connectionStatus" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span>설정 로딩 중...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-6xl mx-auto px-4 pt-6 space-y-6">
+
+    <!-- Section 1: 텔레그램 연동 관리 -->
+    <section class="glass-card rounded-2xl p-6 glass-card-hover">
+      <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-5">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-sky-500/10 text-sky-400">
+            <i class="fa-brands fa-telegram text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-white">텔레그램 Bot 연동 설정</h2>
+            <p class="text-xs text-slate-400">알림을 수신할 Telegram Bot Token 및 Chat ID를 설정합니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Bot Token Input -->
+        <div class="space-y-1.5">
+          <label for="telegramToken" class="block text-xs font-semibold text-slate-300">
+            Telegram Bot Token <span class="text-rose-400">*</span>
+          </label>
+          <div class="relative">
+            <input type="password" id="telegramToken" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                   class="w-full pl-3 pr-10 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+            <button type="button" onclick="togglePasswordVisibility('telegramToken', 'tokenEyeIcon')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-200">
+              <i id="tokenEyeIcon" class="fa-regular fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat ID Input -->
+        <div class="space-y-1.5">
+          <label for="telegramChatId" class="block text-xs font-semibold text-slate-300">
+            Telegram Chat ID (개인 / 채널 ID) <span class="text-rose-400">*</span>
+          </label>
+          <input type="text" id="telegramChatId" placeholder="예: 987654321 또는 -100123456789"
+                 class="w-full px-3 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+        </div>
+      </div>
+
+      <!-- Test Button & Status Message -->
+      <div class="mt-5 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-800">
+        <p class="text-xs text-slate-400">
+          <i class="fa-solid fa-circle-info text-blue-400 mr-1"></i> 토큰 변경 후 하단의 [설정 저장] 버튼을 누르면 즉시 보관됩니다.
+        </p>
+        <button id="btnTestTelegram" onclick="handleTestTelegram()" class="w-full sm:w-auto px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-xl transition shadow-lg shadow-sky-600/20 flex items-center justify-center gap-2">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>연동 테스트 발송</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Section 2: 발송 대상 시장 및 마감 세션 선택 (독립 다중 체크박스) -->
+    <section class="glass-card rounded-2xl p-6 glass-card-hover">
+      <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-5">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+            <i class="fa-solid fa-clock text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-white">발송 대상 시장 및 마감 세션 선택</h2>
+            <p class="text-xs text-slate-400">원하는 세션을 체크한 후 [스케줄 트리거 동기화] 버튼을 눌러 스케줄을 업데이트합니다.</p>
+          </div>
+        </div>
+        
+        <button onclick="handleSyncTriggers()" class="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold transition">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span>트리거 즉시 동기화</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        <!-- Session Card 1: KRX Regular -->
+        <label class="relative flex flex-col p-4 rounded-xl border border-slate-700/80 bg-slate-900/60 cursor-pointer hover:border-blue-500/60 transition group">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">📊</span>
+              <span class="font-bold text-sm text-slate-200">국내 정규장 마감</span>
+            </div>
+            <input type="checkbox" id="krxMain" class="w-5 h-5 text-blue-600 bg-slate-800 border-slate-600 rounded focus:ring-blue-500 focus:ring-offset-slate-900">
+          </div>
+          <div class="text-xs text-slate-400 space-y-1">
+            <p class="text-slate-300 font-medium">마감 시간: <span class="text-blue-400">15:30 KST</span></p>
+            <p>자동 발송: <span class="text-emerald-400">평일 15:35</span></p>
+            <p class="text-[11px] text-slate-500">KOSPI + KOSDAK 통합 시총 상위 분석</p>
+          </div>
+        </label>
+
+        <!-- Session Card 2: KRX NXT -->
+        <label class="relative flex flex-col p-4 rounded-xl border border-slate-700/80 bg-slate-900/60 cursor-pointer hover:border-purple-500/60 transition group">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🌙</span>
+              <span class="font-bold text-sm text-slate-200">국내 NXT 야간장</span>
+            </div>
+            <input type="checkbox" id="krxNxt" class="w-5 h-5 text-purple-600 bg-slate-800 border-slate-600 rounded focus:ring-purple-500 focus:ring-offset-slate-900">
+          </div>
+          <div class="text-xs text-slate-400 space-y-1">
+            <p class="text-slate-300 font-medium">마감 시간: <span class="text-purple-400">20:00 KST</span></p>
+            <p>자동 발송: <span class="text-emerald-400">평일 20:05</span></p>
+            <p class="text-[11px] text-slate-500">대체거래소(NXT) 마감 후 순위 변동</p>
+          </div>
+        </label>
+
+        <!-- Session Card 3: US Main Market -->
+        <label class="relative flex flex-col p-4 rounded-xl border border-slate-700/80 bg-slate-900/60 cursor-pointer hover:border-amber-500/60 transition group">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xl">🇺🇸</span>
+              <span class="font-bold text-sm text-slate-200">미국 본장 마감</span>
+            </div>
+            <input type="checkbox" id="usMain" class="w-5 h-5 text-amber-600 bg-slate-800 border-slate-600 rounded focus:ring-amber-500 focus:ring-offset-slate-900">
+          </div>
+          <div class="text-xs text-slate-400 space-y-1">
+            <p class="text-slate-300 font-medium">마감 시간: <span class="text-amber-400">16:00 ET</span></p>
+            <p>자동 발송: <span class="text-emerald-400">평일 05:05 (DST) / 06:05 (EST)</span></p>
+            <p class="text-[11px] text-slate-500">서머타임 자동 판단 스케줄러 적용</p>
+          </div>
+        </label>
+
+      </div>
+    </section>
+
+    <!-- Section 3: 알림 수신 항목 커스텀 옵션 -->
+    <section class="glass-card rounded-2xl p-6 glass-card-hover">
+      <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-5">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+            <i class="fa-solid fa-sliders text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-white">알림 수신 항목 커스텀 옵션</h2>
+            <p class="text-xs text-slate-400">텔레그램 메시지에 포함할 시총 범위, 과거 비교 시점, 강조 표시 등을 설정합니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-6">
+        
+        <!-- Option Row 1: Range Dropdown -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+          <div>
+            <h3 class="text-sm font-semibold text-white">조회 대상 범위 (시가총액 순위)</h3>
+            <p class="text-xs text-slate-400">리포트에 집계할 시장 상위 종목 수</p>
+          </div>
+          <select id="topN" class="px-4 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm font-medium text-slate-100 focus:outline-none focus:border-blue-500">
+            <option value="10">시가총액 상위 10위</option>
+            <option value="20" selected>시가총액 상위 20위 (추천)</option>
+            <option value="30">시가총액 상위 30위</option>
+            <option value="40">시가총액 상위 40위</option>
+          </select>
+        </div>
+
+        <!-- Option Row 2: Comparison Points (1D, 5D, 1M, 3M, 1Y) -->
+        <div class="space-y-2">
+          <h3 class="text-sm font-semibold text-slate-200">비교 기준 시점 (다중 선택 가능)</h3>
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <input type="checkbox" id="compare1d" class="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded">
+              <span class="text-xs font-medium text-slate-300">1일 전 대비</span>
+            </label>
+            <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <input type="checkbox" id="compare5d" class="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded">
+              <span class="text-xs font-medium text-slate-300">5일 전 대비</span>
+            </label>
+            <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <input type="checkbox" id="compare1m" class="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded">
+              <span class="text-xs font-medium text-slate-300">1개월 전 대비</span>
+            </label>
+            <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <input type="checkbox" id="compare3m" class="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded">
+              <span class="text-xs font-medium text-slate-300">3개월 전 대비</span>
+            </label>
+            <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <input type="checkbox" id="compare1y" class="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded">
+              <span class="text-xs font-medium text-slate-300">1년 전 대비</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Option Row 3: Detail Display Toggles -->
+        <div class="space-y-2">
+          <h3 class="text-sm font-semibold text-slate-200">상세 표기 및 세부 옵션</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            
+            <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <div class="space-y-0.5">
+                <span class="text-xs font-semibold text-slate-200">과거 시가총액 금액 표기</span>
+                <p class="text-[11px] text-slate-400">비교 시점의 시총 금액(조/억원 또는 $B) 표시</p>
+              </div>
+              <input type="checkbox" id="showPastCap" class="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded">
+            </label>
+
+            <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <div class="space-y-0.5">
+                <span class="text-xs font-semibold text-slate-200">시총 등락률(%) 표기</span>
+                <p class="text-[11px] text-slate-400">🔺 +X.XX% / 🔻 -X.XX% 표기</p>
+              </div>
+              <input type="checkbox" id="showChangePercent" class="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded">
+            </label>
+
+            <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <div class="space-y-0.5">
+                <span class="text-xs font-semibold text-slate-200">강조 아이콘 자동 부착</span>
+                <p class="text-[11px] text-slate-400">🚀 10계단+ 급등, 🔥 5계단+ 상승, 🚨 10계단+ 급락</p>
+              </div>
+              <input type="checkbox" id="showIcons" class="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded">
+            </label>
+
+            <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 cursor-pointer hover:border-slate-700">
+              <div class="space-y-0.5">
+                <span class="text-xs font-semibold text-slate-200">종목 상세 링크 (HTML &lt;a&gt; 태그)</span>
+                <p class="text-[11px] text-slate-400">국내: 네이버 증권 / 미국: 구글 파이낸스 연결</p>
+              </div>
+              <input type="checkbox" id="showLinks" class="w-4 h-4 text-blue-600 bg-slate-800 border-slate-600 rounded">
+            </label>
+
+          </div>
+        </div>
+
+        <!-- Option Row 4: Analyst Summary -->
+        <label class="flex items-center justify-between p-4 rounded-xl bg-blue-950/30 border border-blue-900/50 cursor-pointer hover:border-blue-700/60 transition">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+              <i class="fa-solid fa-lightbulb text-lg"></i>
+            </div>
+            <div>
+              <span class="text-xs font-bold text-blue-200">애널리스트 핵심 포인트 요약 섹션 포함</span>
+              <p class="text-[11px] text-blue-300/80">급등 섹터, 급락 종목, 외인/기관 수급 특징 및 총평 자동 첨부</p>
+            </div>
+          </div>
+          <input type="checkbox" id="includeAnalystSummary" class="w-5 h-5 text-blue-600 bg-slate-800 border-slate-600 rounded focus:ring-blue-500">
+        </label>
+
+      </div>
+    </section>
+
+    <!-- Section 4: 리포트 미리보기 & 수동 즉시 발송 제어 -->
+    <section class="glass-card rounded-2xl p-6 glass-card-hover">
+      <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-5">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+            <i class="fa-solid fa-bolt text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-white">리포트 미리보기 & 즉시 발송 제어</h2>
+            <p class="text-xs text-slate-400">발송 전 실제 리포트 내용을 미리 확인(👁️)하거나 텔레그램으로 즉시 전송(🚀)합니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        
+        <!-- Card 1: KRX Main -->
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-slate-200">📊 국내 정규장 마감</span>
+            <span class="text-xs text-blue-400 font-semibold">15:35 KST</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnPreviewKrxMain" onclick="handlePreviewReport('krxMain', 'btnPreviewKrxMain')"
+                    class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 font-medium text-xs rounded-xl border border-blue-500/30 transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-eye"></i>
+              <span>👁️ 미리보기</span>
+            </button>
+            <button id="btnManualKrxMain" onclick="handleManualSend('sendManualKrxMainReport', 'btnManualKrxMain', '국내 정규장')"
+                    class="py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl transition shadow-md flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>🚀 즉시 전송</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2: KRX NXT -->
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-slate-200">🌙 국내 NXT 야간장</span>
+            <span class="text-xs text-purple-400 font-semibold">20:05 KST</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnPreviewKrxNxt" onclick="handlePreviewReport('krxNxt', 'btnPreviewKrxNxt')"
+                    class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-purple-300 font-medium text-xs rounded-xl border border-purple-500/30 transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-eye"></i>
+              <span>👁️ 미리보기</span>
+            </button>
+            <button id="btnManualKrxNxt" onclick="handleManualSend('sendManualKrxNxtReport', 'btnManualKrxNxt', '국내 NXT장')"
+                    class="py-2.5 px-3 bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs rounded-xl transition shadow-md flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>🚀 즉시 전송</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 3: US Main Market -->
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-slate-200">🇺🇸 미국 본장 마감</span>
+            <span class="text-xs text-amber-400 font-semibold">05:05 / 06:05</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnPreviewUs" onclick="handlePreviewReport('usMain', 'btnPreviewUs')"
+                    class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-amber-300 font-medium text-xs rounded-xl border border-amber-500/30 transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-eye"></i>
+              <span>👁️ 미리보기</span>
+            </button>
+            <button id="btnManualUs" onclick="handleManualSend('sendManualUsReport', 'btnManualUs', '미국 마감장')"
+                    class="py-2.5 px-3 bg-amber-600 hover:bg-amber-500 text-white font-medium text-xs rounded-xl transition shadow-md flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>🚀 즉시 전송</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Sticky Bottom Separate Action Bar -->
+  <div class="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/90 border-t border-slate-800 backdrop-blur-lg py-3 px-4">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+      
+      <div class="hidden sm:flex items-center gap-2 text-xs text-slate-400">
+        <i class="fa-solid fa-shield-halved text-blue-400"></i>
+        <span>설정 저장과 스케줄 트리거 동기화 기능이 분리되어 적용됩니다.</span>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+        <button id="btnSave" onclick="handleSaveSettings()"
+                class="flex-1 sm:flex-initial px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-100 font-bold text-xs sm:text-sm rounded-xl transition shadow-md flex items-center justify-center gap-2">
+          <i class="fa-solid fa-floppy-disk text-blue-400"></i>
+          <span>💾 설정 저장 (단독)</span>
+        </button>
+
+        <button id="btnSyncTriggers" onclick="handleSyncTriggers()"
+                class="flex-1 sm:flex-initial px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
+          <i class="fa-solid fa-clock"></i>
+          <span>⏰ 스케줄 트리거 동기화</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Report Preview Modal -->
+  <div id="previewModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-xl bg-blue-500/20 text-blue-400">
+            <i class="fa-solid fa-file-lines text-lg"></i>
+          </div>
+          <div>
+            <h3 id="modalTitle" class="text-base font-bold text-white">리포트 미리보기</h3>
+            <p id="modalSubtitle" class="text-xs text-slate-400">현재 수집된 실시간 데이터 기준 텔레그램 발송 메시지</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="modalCharBadge" class="px-2.5 py-1 text-[11px] font-mono rounded-lg bg-slate-800 text-slate-300 border border-slate-700">0자</span>
+          <button onclick="closePreviewModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Preview Tabs & Content) -->
+      <div class="p-4 flex-1 overflow-y-auto space-y-3">
+        <!-- Tab Bar -->
+        <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
+          <button id="tabRenderBtn" onclick="switchPreviewTab('render')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white">
+            📱 미리보기 렌더링
+          </button>
+          <button id="tabRawBtn" onclick="switchPreviewTab('raw')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-slate-200">
+            📄 Telegram HTML 원문
+          </button>
+        </div>
+
+        <!-- Rendered Tab View -->
+        <div id="previewRenderView" class="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 leading-relaxed whitespace-pre-wrap select-text"></div>
+
+        <!-- Raw HTML Tab View -->
+        <textarea id="previewRawView" readonly class="w-full h-80 p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-300 focus:outline-none hidden select-all"></textarea>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-slate-800 bg-slate-800/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <button onclick="copyPreviewText()" class="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs rounded-xl border border-slate-700 transition flex items-center justify-center gap-2">
+          <i class="fa-regular fa-copy"></i>
+          <span>클립보드 복사</span>
+        </button>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <button onclick="closePreviewModal()" class="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs rounded-xl transition">
+            닫기
+          </button>
+          <button id="modalSendBtn" onclick="sendModalReport()" class="w-full sm:w-auto px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>🚀 이대로 텔레그램 전송</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast Notification Modal Container -->
+  <div id="toastContainer" class="fixed top-20 right-5 z-50 flex flex-col gap-3 max-w-sm pointer-events-none"></div>
+
+  <!-- Script Logic -->
+  <script>
+    let currentPreviewMarketType = '';
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadInitialSettings();
+    });
+
+    function loadInitialSettings() {
+      showStatus('loading', '설정 불러오는 중...');
+      
+      google.script.run
+        .withSuccessHandler(onSettingsLoaded)
+        .withFailureHandler(onApiError)
+        .loadSettings();
+    }
+
+    function onSettingsLoaded(config) {
+      if (!config) return;
+      
+      document.getElementById('telegramToken').value = config.telegramToken || '';
+      document.getElementById('telegramChatId').value = config.telegramChatId || '';
+      
+      document.getElementById('krxMain').checked = !!config.krxMain;
+      document.getElementById('krxNxt').checked = !!config.krxNxt;
+      document.getElementById('usMain').checked = !!config.usMain;
+      
+      document.getElementById('topN').value = config.topN || 20;
+      
+      document.getElementById('compare1d').checked = !!config.compare1d;
+      document.getElementById('compare5d').checked = !!config.compare5d;
+      document.getElementById('compare1m').checked = !!config.compare1m;
+      document.getElementById('compare3m').checked = !!config.compare3m;
+      document.getElementById('compare1y').checked = !!config.compare1y;
+      
+      document.getElementById('showPastCap').checked = !!config.showPastCap;
+      document.getElementById('showChangePercent').checked = !!config.showChangePercent;
+      document.getElementById('showIcons').checked = !!config.showIcons;
+      document.getElementById('showLinks').checked = !!config.showLinks;
+      document.getElementById('includeAnalystSummary').checked = !!config.includeAnalystSummary;
+      
+      showStatus('ready', '정상 연결됨');
+    }
+
+    function collectFormConfig() {
+      return {
+        telegramToken: document.getElementById('telegramToken').value.trim(),
+        telegramChatId: document.getElementById('telegramChatId').value.trim(),
+        krxMain: document.getElementById('krxMain').checked,
+        krxNxt: document.getElementById('krxNxt').checked,
+        usMain: document.getElementById('usMain').checked,
+        topN: parseInt(document.getElementById('topN').value, 10) || 20,
+        compare1d: document.getElementById('compare1d').checked,
+        compare5d: document.getElementById('compare5d').checked,
+        compare1m: document.getElementById('compare1m').checked,
+        compare3m: document.getElementById('compare3m').checked,
+        compare1y: document.getElementById('compare1y').checked,
+        showPastCap: document.getElementById('showPastCap').checked,
+        showChangePercent: document.getElementById('showChangePercent').checked,
+        showIcons: document.getElementById('showIcons').checked,
+        showLinks: document.getElementById('showLinks').checked,
+        includeAnalystSummary: document.getElementById('includeAnalystSummary').checked
+      };
+    }
+
+    function handleSaveSettings() {
+      const config = collectFormConfig();
+      const btn = document.getElementById('btnSave');
+      
+      setButtonLoading(btn, true, '저장 중...');
+      
+      google.script.run
+        .withSuccessHandler((res) => {
+          setButtonLoading(btn, false, '<i class="fa-solid fa-floppy-disk text-blue-400 mr-1"></i> 💾 설정 저장 (단독)');
+          if (res.success) {
+            showToast('success', '설정 저장 완료', res.message);
+          } else {
+            showToast('error', '저장 오류', res.message);
+          }
+        })
+        .withFailureHandler((err) => {
+          setButtonLoading(btn, false, '<i class="fa-solid fa-floppy-disk text-blue-400 mr-1"></i> 💾 설정 저장 (단독)');
+          onApiError(err);
+        })
+        .saveSettings(config);
+    }
+
+    function handleSyncTriggers() {
+      const btn = document.getElementById('btnSyncTriggers');
+      setButtonLoading(btn, true, '트리거 동기화 중...');
+      
+      const config = collectFormConfig();
+      google.script.run
+        .withSuccessHandler(() => {
+          google.script.run
+            .withSuccessHandler((res) => {
+              setButtonLoading(btn, false, '<i class="fa-solid fa-clock mr-1"></i> ⏰ 스케줄 트리거 동기화');
+              if (res.success) {
+                showToast('success', '스케줄 동기화 완료', res.message);
+              } else {
+                showToast('error', '동기화 오류', res.message);
+              }
+            })
+            .withFailureHandler((err) => {
+              setButtonLoading(btn, false, '<i class="fa-solid fa-clock mr-1"></i> ⏰ 스케줄 트리거 동기화');
+              onApiError(err);
+            })
+            .syncTriggersAction();
+        })
+        .saveSettings(config);
+    }
+
+    function handlePreviewReport(marketType, btnId) {
+      const btn = document.getElementById(btnId);
+      const originalHtml = btn.innerHTML;
+      
+      setButtonLoading(btn, true, '데이터 조회 중...');
+      
+      const config = collectFormConfig();
+      google.script.run
+        .withSuccessHandler(() => {
+          google.script.run
+            .withSuccessHandler((res) => {
+              setButtonLoading(btn, false, originalHtml);
+              if (res.success) {
+                currentPreviewMarketType = marketType;
+                openPreviewModal(res);
+              } else {
+                showToast('error', '미리보기 실패', res.message);
+              }
+            })
+            .withFailureHandler((err) => {
+              setButtonLoading(btn, false, originalHtml);
+              onApiError(err);
+            })
+            .previewReport(marketType);
+        })
+        .saveSettings(config);
+    }
+
+    function openPreviewModal(res) {
+      document.getElementById('modalTitle').innerText = res.sessionTitle;
+      document.getElementById('modalSubtitle').innerText = `상위 ${res.stockCount}개 종목 실시간 수집 결과`;
+      document.getElementById('modalCharBadge').innerText = `${res.charCount.toLocaleString()}자`;
+      
+      document.getElementById('previewRenderView').innerHTML = res.htmlMessage;
+      document.getElementById('previewRawView').value = res.htmlMessage;
+      
+      switchPreviewTab('render');
+      document.getElementById('previewModal').classList.remove('hidden');
+    }
+
+    function closePreviewModal() {
+      document.getElementById('previewModal').classList.add('hidden');
+    }
+
+    function switchPreviewTab(tab) {
+      const renderBtn = document.getElementById('tabRenderBtn');
+      const rawBtn = document.getElementById('tabRawBtn');
+      const renderView = document.getElementById('previewRenderView');
+      const rawView = document.getElementById('previewRawView');
+      
+      if (tab === 'render') {
+        renderBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white';
+        rawBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-slate-200';
+        renderView.classList.remove('hidden');
+        rawView.classList.add('hidden');
+      } else {
+        rawBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white';
+        renderBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-slate-200';
+        rawView.classList.remove('hidden');
+        renderView.classList.add('hidden');
+      }
+    }
+
+    function copyPreviewText() {
+      const text = document.getElementById('previewRawView').value;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('success', '복사 완료', '미리보기 텔레그램 HTML 메시지가 클립보드에 복사되었습니다.');
+      }).catch(err => {
+        showToast('error', '복사 실패', err.toString());
+      });
+    }
+
+    function sendModalReport() {
+      if (!currentPreviewMarketType) return;
+      
+      let fnName = 'sendManualKrxMainReport';
+      let label = '국내 정규장';
+      if (currentPreviewMarketType === 'krxNxt') {
+        fnName = 'sendManualKrxNxtReport';
+        label = '국내 NXT장';
+      } else if (currentPreviewMarketType === 'usMain') {
+        fnName = 'sendManualUsReport';
+        label = '미국 마감장';
+      }
+      
+      closePreviewModal();
+      handleManualSend(fnName, 'btnSave', label);
+    }
+
+    function handleTestTelegram() {
+      const token = document.getElementById('telegramToken').value.trim();
+      const chatId = document.getElementById('telegramChatId').value.trim();
+      
+      if (!token || !chatId) {
+        showToast('warning', '입력 확인', 'Bot Token과 Chat ID를 모두 입력해주세요.');
+        return;
+      }
+      
+      const btn = document.getElementById('btnTestTelegram');
+      setButtonLoading(btn, true, '테스트 발송 중...');
+      
+      google.script.run
+        .withSuccessHandler((res) => {
+          setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane mr-1"></i> 연동 테스트 발송');
+          if (res.success) {
+            showToast('success', '테스트 발송 성공', res.message);
+          } else {
+            showToast('error', '발송 실패', res.message);
+          }
+        })
+        .withFailureHandler((err) => {
+          setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane mr-1"></i> 연동 테스트 발송');
+          onApiError(err);
+        })
+        .testTelegram(token, chatId);
+    }
+
+    function handleManualSend(fnName, btnId, label) {
+      const btn = document.getElementById(btnId);
+      const originalHtml = btn ? btn.innerHTML : '';
+      
+      if (btn) setButtonLoading(btn, true, `${label} 발송 중...`);
+      
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (btn) setButtonLoading(btn, false, originalHtml);
+          if (res.success) {
+            showToast('success', `${label} 발송 성공`, res.message);
+          } else {
+            showToast('error', `${label} 발송 실패`, res.message);
+          }
+        })
+        .withFailureHandler((err) => {
+          if (btn) setButtonLoading(btn, false, originalHtml);
+          onApiError(err);
+        })[fnName]();
+    }
+
+    function showStatus(type, text) {
+      const el = document.getElementById('connectionStatus');
+      if (type === 'loading') {
+        el.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span><span>${text}</span>`;
+      } else if (type === 'ready') {
+        el.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-emerald-300 font-medium">${text}</span>`;
+      }
+    }
+
+    function setButtonLoading(btn, isLoading, textOrHtml) {
+      if (!btn) return;
+      if (isLoading) {
+        btn.disabled = true;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> ${textOrHtml}`;
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+        btn.innerHTML = textOrHtml;
+      }
+    }
+
+    function showToast(type, title, message) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      let borderCol = 'border-blue-500';
+      let icon = 'fa-info-circle text-blue-400';
+      
+      if (type === 'success') {
+        borderCol = 'border-emerald-500';
+        icon = 'fa-circle-check text-emerald-400';
+      } else if (type === 'error') {
+        borderCol = 'border-rose-500';
+        icon = 'fa-circle-xmark text-rose-400';
+      } else if (type === 'warning') {
+        borderCol = 'border-amber-500';
+        icon = 'fa-triangle-exclamation text-amber-400';
+      }
+
+      toast.className = `pointer-events-auto p-4 rounded-xl bg-slate-900/95 border ${borderCol} shadow-2xl text-slate-100 transition-all transform translate-y-2 opacity-0 flex items-start gap-3`;
+      toast.innerHTML = `
+        <i class="fa-solid ${icon} text-lg mt-0.5"></i>
+        <div class="flex-1 text-xs">
+          <p class="font-bold text-sm text-white mb-0.5">${escapeHtml(title)}</p>
+          <p class="text-slate-300 leading-relaxed">${escapeHtml(message).replace(/\n/g, '<br>')}</p>
+        </div>
+        <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      `;
+
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.classList.add('opacity-0', 'translate-y-2');
+          setTimeout(() => toast.remove(), 300);
+        }
+      }, 5000);
+    }
+
+    function togglePasswordVisibility(inputId, eyeIconId) {
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById(eyeIconId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fa-regular fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fa-regular fa-eye';
+      }
+    }
+
+    function onApiError(err) {
+      showToast('error', '서버 통신 오류', err.message || err.toString());
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
