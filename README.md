@@ -4,7 +4,7 @@
 
 ---
 
-## 📸 최종 대시보드 스크린샷 (Web App UI)
+## 📸 대시보드 스크린샷 (Web App UI)
 
 ![웹 대시보드 미리보기](assets/dashboard_preview.png)
 
@@ -65,7 +65,7 @@ flowchart TD
 
 ## 📩 텔레그램 수신 메시지 예시
 
-텔레그램에서 수신되는 HTML 포맷 메시지의 최신 예시입니다:
+텔레그램에서 수신되는 HTML 포맷 메시지의 예시입니다:
 
 ```html
 [📊 국내 정규장 마감 시총 분석]
@@ -102,8 +102,7 @@ flowchart TD
 
 ---
 
-## 🔗 최신 배포 실행 주소
+## 🔗 프로젝트 저장소 및 안내
 
-- **배포 Web App URL**: [https://script.google.com/macros/s/AKfycbyRzuxSKuY7kfqaBvqzJw5L54abycadrX1nuSRKEg1ucIFvilCaaOnMN5lHhWu2Ylf6/exec](https://script.google.com/macros/s/AKfycbyRzuxSKuY7kfqaBvqzJw5L54abycadrX1nuSRKEg1ucIFvilCaaOnMN5lHhWu2Ylf6/exec)
-- **GAS 프로젝트 편집기**: [Google Apps Script Editor](https://script.google.com/home/projects/15e5lRqFYzYIiO-nYcg9zLPJKGRTxSv9tSSoZ_95gLQG8K4XvEjlWF0K9/edit)
 - **GitHub 저장소**: [https://github.com/moozuknet/StockRankInfo](https://github.com/moozuknet/StockRankInfo)
+- **실행 가이드**: [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) 참고
