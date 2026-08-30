@@ -317,6 +317,7 @@ function getDefaultConfig() {
     krxMain: true,
     krxNxt: false,
     usMain: true,
+    skipHolidays: true,
     topN: 20,
     compare1d: true,
     compare5d: true,
@@ -446,7 +447,350 @@ function previewReport(marketType) {
 }
 
 // ============================================================================
-// 4. 스케줄러 & 미국 서머타임 (DST) 판별 로직
+// 4. 한국 / 미국 증시 휴장일(주말, 공휴일, 기념일, 거래소 휴장) 판별 엔진
+// ============================================================================
+
+const KRX_HOLIDAYS_MAP = {
+  // 2024년
+  '2024-01-01': '신정',
+  '2024-02-09': '설날 연휴',
+  '2024-02-12': '대체공휴일(설날)',
+  '2024-03-01': '삼일절',
+  '2024-04-10': '제22대 국회의원 선거',
+  '2024-05-01': '근로자의 날 (거래소 휴장)',
+  '2024-05-06': '대체공휴일(어린이날)',
+  '2024-05-15': '부처님오신날',
+  '2024-06-06': '현충일',
+  '2024-08-15': '광복절',
+  '2024-09-16': '추석 연휴',
+  '2024-09-17': '추석',
+  '2024-09-18': '추석 연휴',
+  '2024-10-01': '임시공휴일(국군의날)',
+  '2024-10-03': '개천절',
+  '2024-10-09': '한글날',
+  '2024-12-25': '성탄절',
+  '2024-12-31': '연말 결산 휴장일',
+
+  // 2025년
+  '2025-01-01': '신정',
+  '2025-01-28': '설날 연휴',
+  '2025-01-29': '설날',
+  '2025-01-30': '설날 연휴',
+  '2025-03-03': '대체공휴일(삼일절)',
+  '2025-05-01': '근로자의 날 (거래소 휴장)',
+  '2025-05-05': '어린이날 / 부처님오신날',
+  '2025-05-06': '대체공휴일',
+  '2025-06-06': '현충일',
+  '2025-08-15': '광복절',
+  '2025-10-03': '개천절',
+  '2025-10-06': '추석',
+  '2025-10-07': '추석 연휴',
+  '2025-10-08': '대체공휴일(추석)',
+  '2025-10-09': '한글날',
+  '2025-12-25': '성탄절',
+  '2025-12-31': '연말 결산 휴장일',
+
+  // 2026년
+  '2026-01-01': '신정',
+  '2026-02-16': '설날 연휴',
+  '2026-02-17': '설날',
+  '2026-02-18': '설날 연휴',
+  '2026-03-02': '대체공휴일(삼일절)',
+  '2026-05-01': '근로자의 날 (거래소 휴장)',
+  '2026-05-05': '어린이날',
+  '2026-05-24': '부처님오신날',
+  '2026-05-25': '대체공휴일(부처님오신날)',
+  '2026-06-03': '제9회 전국동시지방선거',
+  '2026-06-06': '현충일',
+  '2026-08-17': '대체공휴일(광복절)',
+  '2026-09-24': '추석 연휴',
+  '2026-09-25': '추석',
+  '2026-09-26': '추석 연휴',
+  '2026-10-05': '대체공휴일(개천절)',
+  '2026-10-09': '한글날',
+  '2026-12-25': '성탄절',
+  '2026-12-31': '연말 결산 휴장일',
+
+  // 2027년
+  '2027-01-01': '신정',
+  '2027-02-06': '설날 연휴',
+  '2027-02-07': '설날',
+  '2027-02-08': '설날 연휴',
+  '2027-02-09': '대체공휴일(설날)',
+  '2027-03-01': '삼일절',
+  '2027-05-01': '근로자의 날 (거래소 휴장)',
+  '2027-05-05': '어린이날',
+  '2027-05-13': '부처님오신날',
+  '2027-06-06': '현충일',
+  '2027-08-16': '대체공휴일(광복절)',
+  '2027-09-14': '추석 연휴',
+  '2027-09-15': '추석',
+  '2027-09-16': '추석 연휴',
+  '2027-10-04': '대체공휴일(개천절)',
+  '2027-10-11': '대체공휴일(한글날)',
+  '2027-12-25': '성탄절',
+  '2027-12-31': '연말 결산 휴장일',
+
+  // 2028년
+  '2028-01-01': '신정',
+  '2028-01-26': '설날 연휴',
+  '2028-01-27': '설날',
+  '2028-01-28': '설날 연휴',
+  '2028-03-01': '삼일절',
+  '2028-04-12': '제23대 국회의원 선거',
+  '2028-05-01': '근로자의 날 (거래소 휴장)',
+  '2028-05-02': '부처님오신날',
+  '2028-05-05': '어린이날',
+  '2028-06-06': '현충일',
+  '2028-08-15': '광복절',
+  '2028-10-02': '추석 연휴',
+  '2028-10-03': '개천절 / 추석',
+  '2028-10-04': '추석 연휴',
+  '2028-10-05': '대체공휴일',
+  '2028-10-09': '한글날',
+  '2028-12-25': '성탄절',
+  '2028-12-29': '연말 결산 휴장일'
+};
+
+const US_MARKET_HOLIDAYS_MAP = {
+  // 2024년
+  '2024-01-01': "New Year's Day",
+  '2024-01-15': 'Martin Luther King Jr. Day',
+  '2024-02-19': "Presidents' Day",
+  '2024-03-29': 'Good Friday',
+  '2024-05-27': 'Memorial Day',
+  '2024-06-19': 'Juneteenth National Independence Day',
+  '2024-07-04': 'Independence Day',
+  '2024-09-02': 'Labor Day',
+  '2024-11-28': 'Thanksgiving Day',
+  '2024-12-25': 'Christmas Day',
+
+  // 2025년
+  '2025-01-01': "New Year's Day",
+  '2025-01-20': 'Martin Luther King Jr. Day',
+  '2025-02-17': "Presidents' Day",
+  '2025-04-18': 'Good Friday',
+  '2025-05-26': 'Memorial Day',
+  '2025-06-19': 'Juneteenth',
+  '2025-07-04': 'Independence Day',
+  '2025-09-01': 'Labor Day',
+  '2025-11-27': 'Thanksgiving Day',
+  '2025-12-25': 'Christmas Day',
+
+  // 2026년
+  '2026-01-01': "New Year's Day",
+  '2026-01-19': 'Martin Luther King Jr. Day',
+  '2026-02-16': "Presidents' Day",
+  '2026-04-03': 'Good Friday',
+  '2026-05-25': 'Memorial Day',
+  '2026-06-19': 'Juneteenth',
+  '2026-07-03': 'Independence Day (대체휴일)',
+  '2026-09-07': 'Labor Day',
+  '2026-11-26': 'Thanksgiving Day',
+  '2026-12-25': 'Christmas Day',
+
+  // 2027년
+  '2027-01-01': "New Year's Day",
+  '2027-01-18': 'Martin Luther King Jr. Day',
+  '2027-02-15': "Presidents' Day",
+  '2027-03-26': 'Good Friday',
+  '2027-05-31': 'Memorial Day',
+  '2027-06-18': 'Juneteenth (대체휴일)',
+  '2027-07-05': 'Independence Day (대체휴일)',
+  '2027-09-06': 'Labor Day',
+  '2027-11-25': 'Thanksgiving Day',
+  '2027-12-24': 'Christmas Day (대체휴일)',
+
+  // 2028년
+  '2028-01-17': 'Martin Luther King Jr. Day',
+  '2028-02-21': "Presidents' Day",
+  '2028-04-14': 'Good Friday',
+  '2028-05-29': 'Memorial Day',
+  '2028-06-19': 'Juneteenth',
+  '2028-07-04': 'Independence Day',
+  '2028-09-04': 'Labor Day',
+  '2028-11-23': 'Thanksgiving Day',
+  '2028-12-25': 'Christmas Day'
+};
+
+/**
+ * 한국 증시 (KRX / NXT) 휴장일 판별
+ * @param {Date} [targetDate] - 검사할 일시 (기본값: 현재)
+ * @returns {{ isHoliday: boolean, reason: string, dateStr: string, dayOfWeek: string }}
+ */
+function isKrxHoliday(targetDate) {
+  const d = targetDate ? new Date(targetDate) : new Date();
+  const dateStr = Utilities.formatDate(d, 'Asia/Seoul', 'yyyy-MM-dd');
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+  
+  // KST 기준 요일 구하기
+  const kstFormatted = Utilities.formatDate(d, 'Asia/Seoul', 'u'); // 1(Mon) - 7(Sun)
+  const dayOfWeekNum = (parseInt(kstFormatted, 10) % 7); // 0(Sun), 1(Mon), ..., 6(Sat)
+  const dayName = dayNames[dayOfWeekNum];
+
+  // 1. 주말(토/일) 체크
+  if (dayOfWeekNum === 0 || dayOfWeekNum === 6) {
+    return {
+      isHoliday: true,
+      reason: `주말 (${dayName}요일 휴장)`,
+      dateStr: dateStr,
+      dayOfWeek: dayName
+    };
+  }
+
+  // 2. 마스터 휴장일(공휴일, 근로자의날, 연말결산휴장 등) 체크
+  if (KRX_HOLIDAYS_MAP[dateStr]) {
+    return {
+      isHoliday: true,
+      reason: KRX_HOLIDAYS_MAP[dateStr],
+      dateStr: dateStr,
+      dayOfWeek: dayName
+    };
+  }
+
+  // 3. 5월 1일 근로자의 날 / 12월 31일 연말휴장일 고정 룰 백업 (연도 무관)
+  const monthDay = dateStr.slice(5); // 'MM-dd'
+  if (monthDay === '05-01') {
+    return {
+      isHoliday: true,
+      reason: '근로자의 날 (한국거래소 휴장)',
+      dateStr: dateStr,
+      dayOfWeek: dayName
+    };
+  }
+  if (monthDay === '12-31') {
+    return {
+      isHoliday: true,
+      reason: '연말 결산 휴장일',
+      dateStr: dateStr,
+      dayOfWeek: dayName
+    };
+  }
+
+  // 4. Google Calendar 공휴일 캘린더 조회 시도 (추가 보완)
+  try {
+    const cal = CalendarApp.getCalendarById('ko.south_korea#holiday@group.v.calendar.google.com');
+    if (cal) {
+      const startOfDay = new Date(dateStr + 'T00:00:00+09:00');
+      const endOfDay = new Date(dateStr + 'T23:59:59+09:00');
+      const events = cal.getEvents(startOfDay, endOfDay);
+      if (events && events.length > 0) {
+        return {
+          isHoliday: true,
+          reason: events[0].getTitle(),
+          dateStr: dateStr,
+          dayOfWeek: dayName
+        };
+      }
+    }
+  } catch (e) {
+    // 캘린더 접근 권한이 없거나 미지원 시 마스터 테이블로 통과
+  }
+
+  return {
+    isHoliday: false,
+    reason: '정상 개장일',
+    dateStr: dateStr,
+    dayOfWeek: dayName
+  };
+}
+
+/**
+ * 미국 증시 (US Market) 휴장일 판별
+ * - KST 아침(05:00~07:00)에 실행 시 분석 대상이 되는 미국 현지 거래일(US Market Date)을 계산하여 판별
+ * @param {Date} [targetDate] - 검사할 일시 (기본값: 현재)
+ * @returns {{ isHoliday: boolean, reason: string, marketDateStr: string, dayOfWeek: string }}
+ */
+function isUsHoliday(targetDate) {
+  const d = targetDate ? new Date(targetDate) : new Date();
+  
+  // 미국 동부시간(ET: America/New_York) 기준 날짜 및 시간 계산
+  // KST 05:00~06:00은 미국 동부시간 기준 전일 16:00~17:00 (방금 마감된 장)
+  const usDateStr = Utilities.formatDate(d, 'America/New_York', 'yyyy-MM-dd');
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+  
+  const usDayFormatted = Utilities.formatDate(d, 'America/New_York', 'u'); // 1(Mon) - 7(Sun)
+  const usDayNum = (parseInt(usDayFormatted, 10) % 7); // 0(Sun), ..., 6(Sat)
+  const dayName = dayNames[usDayNum];
+
+  // 1. 미국 현지 주말(토/일) 체크
+  if (usDayNum === 0 || usDayNum === 6) {
+    return {
+      isHoliday: true,
+      reason: `미국 현지 주말 (${dayName}요일 휴장)`,
+      marketDateStr: usDateStr,
+      dayOfWeek: dayName
+    };
+  }
+
+  // 2. 미국 마스터 증시 휴장일 체크
+  if (US_MARKET_HOLIDAYS_MAP[usDateStr]) {
+    return {
+      isHoliday: true,
+      reason: `미국 공휴일 (${US_MARKET_HOLIDAYS_MAP[usDateStr]})`,
+      marketDateStr: usDateStr,
+      dayOfWeek: dayName
+    };
+  }
+
+  // 3. Google Calendar 미국 공휴일 조회 시도
+  try {
+    const cal = CalendarApp.getCalendarById('en.usa#holiday@group.v.calendar.google.com');
+    if (cal) {
+      const startOfDay = new Date(usDateStr + 'T00:00:00-05:00');
+      const endOfDay = new Date(usDateStr + 'T23:59:59-05:00');
+      const events = cal.getEvents(startOfDay, endOfDay);
+      if (events && events.length > 0) {
+        return {
+          isHoliday: true,
+          reason: `미국 공휴일 (${events[0].getTitle()})`,
+          marketDateStr: usDateStr,
+          dayOfWeek: dayName
+        };
+      }
+    }
+  } catch (e) {
+    // 캘린더 접근 불가 시 마스터 테이블 결과로 통과
+  }
+
+  return {
+    isHoliday: false,
+    reason: '정상 개장일',
+    marketDateStr: usDateStr,
+    dayOfWeek: dayName
+  };
+}
+
+/**
+ * 대시보드 UI를 위한 현재 한국/미국 증시 장운영 상태 조회 API
+ */
+function getMarketStatus() {
+  const now = new Date();
+  const krxCheck = isKrxHoliday(now);
+  const usCheck = isUsHoliday(now);
+  
+  return {
+    success: true,
+    nowKst: formatDate(now),
+    krx: {
+      dateStr: krxCheck.dateStr,
+      dayOfWeek: krxCheck.dayOfWeek,
+      isHoliday: krxCheck.isHoliday,
+      reason: krxCheck.reason,
+      isOpen: !krxCheck.isHoliday
+    },
+    us: {
+      marketDateStr: usCheck.marketDateStr,
+      dayOfWeek: usCheck.dayOfWeek,
+      isHoliday: usCheck.isHoliday,
+      reason: usCheck.reason,
+      isOpen: !usCheck.isHoliday
+    }
+  };
+}
+
+// ============================================================================
+// 5. 스케줄러 & 미국 서머타임 (DST) 판별 로직
 // ============================================================================
 
 function isUsDst(date) {
@@ -1093,6 +1437,17 @@ function splitHtmlMessage(text, maxLength) {
 
 function sendKrxMainReport() {
   const config = loadSettings();
+  
+  // 휴장일 자동 발송 제외 체크
+  if (config.skipHolidays) {
+    const check = isKrxHoliday(new Date());
+    if (check.isHoliday) {
+      const skipLog = `[발송 제외] 오늘은 국내 증시 휴장일(${check.reason})이므로 정규장 마감 리포트 발송을 건너뜁니다.`;
+      Logger.log(skipLog);
+      return { success: true, skipped: true, message: skipLog };
+    }
+  }
+
   const data = fetchKrxMarketData(config.topN);
   const processed = calculateHistoricalChanges(data, config);
   const html = generateReportHtml('[📊 국내 정규장 마감 시총 분석]', processed, config);
@@ -1101,6 +1456,17 @@ function sendKrxMainReport() {
 
 function sendKrxNxtReport() {
   const config = loadSettings();
+  
+  // 휴장일 자동 발송 제외 체크
+  if (config.skipHolidays) {
+    const check = isKrxHoliday(new Date());
+    if (check.isHoliday) {
+      const skipLog = `[발송 제외] 오늘은 국내 증시 휴장일(${check.reason})이므로 NXT 야간장 마감 리포트 발송을 건너뜁니다.`;
+      Logger.log(skipLog);
+      return { success: true, skipped: true, message: skipLog };
+    }
+  }
+
   const data = fetchKrxMarketData(config.topN);
   const processed = calculateHistoricalChanges(data, config);
   const html = generateReportHtml('[🌙 국내 NXT 야간장 마감 시총 분석]', processed, config);
@@ -1109,15 +1475,47 @@ function sendKrxNxtReport() {
 
 function sendUsReport() {
   const config = loadSettings();
+  
+  // 휴장일 자동 발송 제외 체크
+  if (config.skipHolidays) {
+    const check = isUsHoliday(new Date());
+    if (check.isHoliday) {
+      const skipLog = `[발송 제외] 분석 대상 미국 증시 세션이 휴장(${check.reason})이므로 미국 마감 리포트 발송을 건너뜁니다.`;
+      Logger.log(skipLog);
+      return { success: true, skipped: true, message: skipLog };
+    }
+  }
+
   const data = fetchUsMarketData(config.topN);
   const processed = calculateHistoricalChanges(data, config);
   const html = generateReportHtml('[🇺🇸 미국 증시 마감 시총 분석]', processed, config);
   return sendTelegramMessage(config, html);
 }
 
-function sendManualKrxMainReport() { return sendKrxMainReport(); }
-function sendManualKrxNxtReport() { return sendKrxNxtReport(); }
-function sendManualUsReport() { return sendUsReport(); }
+// 수동 즉시 발송 함수 (대시보드 UI 테스트용 - 휴장일이라도 강제 전송)
+function sendManualKrxMainReport() {
+  const config = loadSettings();
+  const data = fetchKrxMarketData(config.topN);
+  const processed = calculateHistoricalChanges(data, config);
+  const html = generateReportHtml('[📊 국내 정규장 마감 시총 분석]', processed, config);
+  return sendTelegramMessage(config, html);
+}
+
+function sendManualKrxNxtReport() {
+  const config = loadSettings();
+  const data = fetchKrxMarketData(config.topN);
+  const processed = calculateHistoricalChanges(data, config);
+  const html = generateReportHtml('[🌙 국내 NXT 야간장 마감 시총 분석]', processed, config);
+  return sendTelegramMessage(config, html);
+}
+
+function sendManualUsReport() {
+  const config = loadSettings();
+  const data = fetchUsMarketData(config.topN);
+  const processed = calculateHistoricalChanges(data, config);
+  const html = generateReportHtml('[🇺🇸 미국 증시 마감 시총 분석]', processed, config);
+  return sendTelegramMessage(config, html);
+}
 
 function formatDate(date) {
   return Utilities.formatDate(date, 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss') + ' (KST)';

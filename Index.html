@@ -105,6 +105,38 @@
   <!-- Main Container -->
   <main class="max-w-6xl mx-auto px-4 pt-6 space-y-6">
 
+    <!-- Market Status Banner (실시간 장운영/휴장일 상태 위젯) -->
+    <div id="marketStatusBanner" class="glass-card rounded-2xl p-4 border border-slate-700/60 bg-gradient-to-r from-slate-900/90 via-slate-800/80 to-slate-900/90">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <i class="fa-solid fa-calendar-check text-lg"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-bold text-white">오늘의 증시 개장 / 휴장 현황</h3>
+              <span id="marketStatusTime" class="text-[11px] text-slate-400">조회 중...</span>
+            </div>
+            <p class="text-xs text-slate-400">휴장일에는 이전과 동일한 시황 데이터이므로 자동 발송을 건너뜁니다.</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <!-- KRX Status Badge -->
+          <div id="krxStatusBadge" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300">
+            <span>🇰🇷 한국:</span>
+            <span id="krxStatusText" class="text-amber-400">확인 중...</span>
+          </div>
+
+          <!-- US Status Badge -->
+          <div id="usStatusBadge" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300">
+            <span>🇺🇸 미국:</span>
+            <span id="usStatusText" class="text-amber-400">확인 중...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Section 1: 텔레그램 연동 관리 -->
     <section class="glass-card rounded-2xl p-6 glass-card-hover">
       <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-5">
@@ -243,6 +275,25 @@
       </div>
 
       <div class="space-y-6">
+
+        <!-- Option Row 0: 휴장일 자동 발송 제외 (스킵) 핵심 토글 -->
+        <label class="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-emerald-950/40 via-slate-900/70 to-emerald-950/30 border border-emerald-500/30 cursor-pointer hover:border-emerald-500/60 transition group">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 group-hover:scale-105 transition">
+              <i class="fa-solid fa-calendar-xmark text-lg"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-emerald-200">휴장일 자동 발송 제외 (주말 / 공휴일 / 거래소 휴장 스킵)</span>
+                <span class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">추천 (기본값)</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-0.5">
+                주말(토/일), 법정 공휴일, 근로자의 날(5/1), 연말 휴장일(12/31) 및 미국 증시 휴장 시 불필요한 중복 시황 발송을 건너뜁니다.
+              </p>
+            </div>
+          </div>
+          <input type="checkbox" id="skipHolidays" class="w-5 h-5 text-emerald-600 bg-slate-800 border-slate-600 rounded focus:ring-emerald-500">
+        </label>
         
         <!-- Option Row 1: Range Dropdown -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/40 border border-slate-800">
@@ -339,7 +390,6 @@
           <input type="checkbox" id="includeAnalystSummary" class="w-5 h-5 text-blue-600 bg-slate-800 border-slate-600 rounded focus:ring-blue-500">
         </label>
 
-      </div>
     </section>
 
     <!-- Section 4: 리포트 미리보기 & 수동 즉시 발송 제어 -->
@@ -521,6 +571,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       loadInitialSettings();
+      loadMarketStatus();
     });
 
     function loadInitialSettings() {
@@ -532,6 +583,48 @@
         .loadSettings();
     }
 
+    function loadMarketStatus() {
+      google.script.run
+        .withSuccessHandler(onMarketStatusLoaded)
+        .withFailureHandler(() => {
+          document.getElementById('krxStatusText').innerText = '상태 확인 불가';
+          document.getElementById('usStatusText').innerText = '상태 확인 불가';
+        })
+        .getMarketStatus();
+    }
+
+    function onMarketStatusLoaded(status) {
+      if (!status || !status.success) return;
+
+      document.getElementById('marketStatusTime').innerText = `(${status.nowKst} 기준)`;
+
+      // 한국 증시 뱃지
+      const krxBadge = document.getElementById('krxStatusBadge');
+      const krxText = document.getElementById('krxStatusText');
+      if (status.krx.isOpen) {
+        krxBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-300';
+        krxText.className = 'text-emerald-400 font-bold';
+        krxText.innerText = `오늘 개장 (${status.krx.dayOfWeek}요일)`;
+      } else {
+        krxBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/10 border border-rose-500/30 text-rose-300';
+        krxText.className = 'text-rose-400 font-bold';
+        krxText.innerText = `오늘 휴장 (${status.krx.reason})`;
+      }
+
+      // 미국 증시 뱃지
+      const usBadge = document.getElementById('usStatusBadge');
+      const usText = document.getElementById('usStatusText');
+      if (status.us.isOpen) {
+        usBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-300';
+        usText.className = 'text-emerald-400 font-bold';
+        usText.innerText = `정규 개장 (${status.us.dayOfWeek}요일)`;
+      } else {
+        usBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-300';
+        usText.className = 'text-amber-400 font-bold';
+        usText.innerText = `휴장 (${status.us.reason})`;
+      }
+    }
+
     function onSettingsLoaded(config) {
       if (!config) return;
       
@@ -541,6 +634,7 @@
       document.getElementById('krxMain').checked = !!config.krxMain;
       document.getElementById('krxNxt').checked = !!config.krxNxt;
       document.getElementById('usMain').checked = !!config.usMain;
+      document.getElementById('skipHolidays').checked = (config.skipHolidays !== false);
       
       document.getElementById('topN').value = config.topN || 20;
       
@@ -566,6 +660,7 @@
         krxMain: document.getElementById('krxMain').checked,
         krxNxt: document.getElementById('krxNxt').checked,
         usMain: document.getElementById('usMain').checked,
+        skipHolidays: document.getElementById('skipHolidays').checked,
         topN: parseInt(document.getElementById('topN').value, 10) || 20,
         compare1d: document.getElementById('compare1d').checked,
         compare5d: document.getElementById('compare5d').checked,
