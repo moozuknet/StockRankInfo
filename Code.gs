@@ -312,6 +312,9 @@ function doGet(e) {
 
 function getDefaultConfig() {
   return {
+    telegramBots: [
+      { id: 'bot_1', name: '기본 봇', token: '', chatId: '', enabled: true }
+    ],
     telegramToken: '',
     telegramChatId: '',
     krxMain: true,
@@ -340,7 +343,37 @@ function loadSettings() {
       return getDefaultConfig();
     }
     const saved = JSON.parse(jsonStr);
-    return Object.assign(getDefaultConfig(), saved);
+    const config = Object.assign(getDefaultConfig(), saved);
+    
+    // 마이그레이션 및 정규화
+    if (!Array.isArray(config.telegramBots) || config.telegramBots.length === 0) {
+      config.telegramBots = [];
+      if (config.telegramToken || config.telegramChatId) {
+        config.telegramBots.push({
+          id: 'bot_1',
+          name: '기본 봇',
+          token: config.telegramToken || '',
+          chatId: config.telegramChatId || '',
+          enabled: true
+        });
+      } else {
+        config.telegramBots.push({
+          id: 'bot_1',
+          name: '기본 봇',
+          token: '',
+          chatId: '',
+          enabled: true
+        });
+      }
+    }
+    
+    // 레거시 필드 동기화
+    if (config.telegramBots.length > 0) {
+      config.telegramToken = config.telegramBots[0].token || '';
+      config.telegramChatId = config.telegramBots[0].chatId || '';
+    }
+    
+    return config;
   } catch (err) {
     Logger.log('loadSettings Error: ' + err.toString());
     return getDefaultConfig();
@@ -354,6 +387,33 @@ function saveSettings(config) {
     }
     
     config.topN = parseInt(config.topN, 10) || 20;
+    
+    // telegramBots 유효성 검사 및 정규화
+    if (Array.isArray(config.telegramBots)) {
+      config.telegramBots = config.telegramBots.map((b, idx) => ({
+        id: b.id || ('bot_' + (idx + 1) + '_' + Date.now()),
+        name: (b.name && b.name.trim()) ? b.name.trim() : `봇 ${idx + 1}`,
+        token: (b.token || '').trim(),
+        chatId: (b.chatId || '').trim(),
+        enabled: b.enabled !== false
+      }));
+      
+      if (config.telegramBots.length > 0) {
+        config.telegramToken = config.telegramBots[0].token || '';
+        config.telegramChatId = config.telegramBots[0].chatId || '';
+      }
+    } else {
+      config.telegramBots = [
+        {
+          id: 'bot_1',
+          name: '기본 봇',
+          token: (config.telegramToken || '').trim(),
+          chatId: (config.telegramChatId || '').trim(),
+          enabled: true
+        }
+      ];
+    }
+    
     const props = PropertiesService.getScriptProperties();
     props.setProperty('APP_CONFIG', JSON.stringify(config));
     
@@ -384,25 +444,26 @@ function syncTriggersAction() {
   }
 }
 
-function testTelegram(token, chatId) {
+function testTelegram(token, chatId, botName) {
   try {
     if (!token || !chatId) {
       return { success: false, message: 'Bot Token과 Chat ID를 모두 입력해주세요.' };
     }
     
+    const nameStr = botName ? ` (${botName})` : '';
     const text = `<b>[🤖 텔레그램 연동 테스트 성공]</b>\n\n` +
-                 `증시 시가총액 변동 분석 봇과 정상적으로 연결되었습니다!\n` +
+                 `증시 시가총액 변동 분석 봇${nameStr}과 정상적으로 연결되었습니다!\n` +
                  `⏱ <b>발송 일시:</b> ${formatDate(new Date())}\n\n` +
                  `설정 대시보드에서 마감 세션 및 알림 수신 옵션을 관리할 수 있습니다.`;
                  
     const res = sendTelegramRaw(token, chatId, text);
     if (res.ok) {
-      return { success: true, message: '테스트 메시지가 텔레그램으로 성공적으로 발송되었습니다!' };
+      return { success: true, message: `[${botName || '봇'}] 테스트 메시지가 텔레그램으로 성공적으로 발송되었습니다!` };
     } else {
-      return { success: false, message: '텔레그램 발송 실패: ' + (res.description || '토큰 및 Chat ID를 확인해주세요.') };
+      return { success: false, message: `[${botName || '봇'}] 발송 실패: ` + (res.description || '토큰 및 Chat ID를 확인해주세요.') };
     }
   } catch (err) {
-    return { success: false, message: '연동 테스트 중 예외 발생: ' + err.message };
+    return { success: false, message: `[${botName || '봇'}] 연동 테스트 중 예외 발생: ` + err.message };
   }
 }
 
@@ -1360,30 +1421,71 @@ function generateAnalystSummary(stockList, sessionTitle, config) {
 }
 
 function sendTelegramMessage(config, htmlMessage) {
-  if (!config.telegramToken || !config.telegramChatId) {
-    return { success: false, message: '텔레그램 Bot Token과 Chat ID를 등록해주세요.' };
+  // 타깃 봇 목록 추출
+  let targetBots = [];
+  if (Array.isArray(config.telegramBots) && config.telegramBots.length > 0) {
+    targetBots = config.telegramBots.filter(b => b.enabled !== false && b.token && b.chatId);
+  } else if (config.telegramToken && config.telegramChatId) {
+    targetBots = [{
+      name: '기본 봇',
+      token: config.telegramToken,
+      chatId: config.telegramChatId,
+      enabled: true
+    }];
+  }
+  
+  if (targetBots.length === 0) {
+    return { success: false, message: '활성화된 텔레그램 봇(Bot Token 및 Chat ID)이 등록되어 있지 않습니다.' };
   }
   
   const chunks = splitHtmlMessage(htmlMessage, 4000);
-  let allSuccess = true;
-  let lastError = '';
+  let successCount = 0;
+  let failCount = 0;
+  const errors = [];
   
-  chunks.forEach((chunk, index) => {
-    let payloadText = chunk;
-    if (chunks.length > 1) {
-      payloadText = `<b>[분할 리포트 ${index + 1}/${chunks.length}]</b>\n` + chunk;
-    }
-    const res = sendTelegramRaw(config.telegramToken, config.telegramChatId, payloadText);
-    if (!res.ok) {
-      allSuccess = false;
-      lastError = res.description || 'Telegram API Error';
+  targetBots.forEach(bot => {
+    let botAllSuccess = true;
+    let botLastError = '';
+    
+    chunks.forEach((chunk, index) => {
+      let payloadText = chunk;
+      if (chunks.length > 1) {
+        payloadText = `<b>[분할 리포트 ${index + 1}/${chunks.length}]</b>\n` + chunk;
+      }
+      const res = sendTelegramRaw(bot.token, bot.chatId, payloadText);
+      if (!res.ok) {
+        botAllSuccess = false;
+        botLastError = res.description || 'Telegram API Error';
+      }
+    });
+    
+    if (botAllSuccess) {
+      successCount++;
+    } else {
+      failCount++;
+      errors.push(`${bot.name || '봇'}: ${botLastError}`);
     }
   });
   
-  return {
-    success: allSuccess,
-    message: allSuccess ? '텔레그램 발송이 완료되었습니다!' : ('텔레그램 발송 실패: ' + lastError)
-  };
+  const total = targetBots.length;
+  if (failCount === 0) {
+    return {
+      success: true,
+      message: total === 1 
+        ? '텔레그램 발송이 완료되었습니다!' 
+        : `총 ${total}개의 텔레그램 봇으로 리포트 발송이 완료되었습니다!`
+    };
+  } else if (successCount > 0) {
+    return {
+      success: true,
+      message: `일부 봇 발송 성공 (${successCount}/${total}개 성공).\n실패 사유: ${errors.join(', ')}`
+    };
+  } else {
+    return {
+      success: false,
+      message: `텔레그램 발송 실패 (0/${total}개 성공).\n원인: ${errors.join(', ')}`
+    };
+  }
 }
 
 function sendTelegramRaw(token, chatId, htmlText) {
