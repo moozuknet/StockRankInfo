@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>利앹떆 ?쒓?珥앹븸 蹂??遺꾩꽍 & ?붾젅洹몃옩 ?ㅼ쨷 ?뚮┝ ??쒕낫??/title>
+  <title>증시 시가총액 변동 분석 &amp; 텔레그램 다중 알림 대시보드</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -36,7 +36,7 @@
           }
         }
       }
-    }
+    };
   </script>
 
   <style>
@@ -91,16 +91,16 @@
         </div>
         <div>
           <h1 class="text-base sm:text-lg font-bold font-display tracking-tight text-white flex items-center gap-2">
-            利앹떆 ?쒓?珥앹븸 蹂??遺꾩꽍
+            증시 시가총액 변동 분석
             <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-sans font-medium">v2.1 Multi-Bot</span>
           </h1>
-          <p class="text-xs text-slate-400 hidden sm:block">KRX ?뺢퇋??쨌 NXT ?쇨컙嫄곕옒??쨌 誘멸뎅 利앹떆 留덇컧 ?ㅼ쨷 ?붾젅洹몃옩 ?먮룞 釉뚮━??/p>
+          <p class="text-xs text-slate-400 hidden sm:block">KRX 정규장 · NXT 야간거래소 · 미국 증시 마감 다중 텔레그램 자동 브리핑</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
         <div id="connectionStatus" class="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800">
           <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-          <span class="text-slate-300">?ㅼ젙 遺덈윭?ㅻ뒗 以?..</span>
+          <span class="text-slate-300">설정 불러오는 중...</span>
         </div>
       </div>
     </div>
@@ -114,16 +114,16 @@
       <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
         <div class="flex items-center gap-2">
           <i class="fa-solid fa-earth-asia text-sky-400"></i>
-          <h2 class="text-sm font-bold text-slate-200">?ㅻ뒛??湲濡쒕쾶 ?쒖옣 媛쒖옣 ?꾪솴 (怨듯쑕??& ?댁옣 ?꾪꽣)</h2>
+          <h2 class="text-sm font-bold text-slate-200">오늘의 글로벌 시장 개장 현황 (공휴일 &amp; 휴장 필터)</h2>
         </div>
-        <span id="marketTodayDate" class="text-xs font-mono text-slate-400">議고쉶 以?..</span>
+        <span id="marketTodayDate" class="text-xs font-mono text-slate-400">조회 중...</span>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <!-- KRX Regular -->
         <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
           <div>
-            <div class="text-xs text-slate-400">援?궡 ?뺢퇋??(KRX)</div>
-            <div id="krxMainText" class="text-sm font-bold text-slate-200 mt-0.5">?뺤씤 以?..</div>
+            <div class="text-xs text-slate-400">국내 정규장 (KRX)</div>
+            <div id="krxMainText" class="text-sm font-bold text-slate-200 mt-0.5">확인 중...</div>
           </div>
           <div id="krxMainBadge" class="p-2 rounded-lg bg-slate-800 text-slate-400">
             <i class="fa-solid fa-spinner fa-spin"></i>
@@ -133,8 +133,8 @@
         <!-- KRX NXT -->
         <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
           <div>
-            <div class="text-xs text-slate-400">援?궡 ?쇨컙 ?泥닿굅?섏냼 (NXT)</div>
-            <div id="krxNxtText" class="text-sm font-bold text-slate-200 mt-0.5">?뺤씤 以?..</div>
+            <div class="text-xs text-slate-400">국내 야간 대체거래소 (NXT)</div>
+            <div id="krxNxtText" class="text-sm font-bold text-slate-200 mt-0.5">확인 중...</div>
           </div>
           <div id="krxNxtBadge" class="p-2 rounded-lg bg-slate-800 text-slate-400">
             <i class="fa-solid fa-spinner fa-spin"></i>
@@ -144,8 +144,8 @@
         <!-- US Regular -->
         <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
           <div>
-            <div class="text-xs text-slate-400">誘멸뎅 ?뺢퇋 利앹떆 (NYSE/NASDAQ)</div>
-            <div id="usMainText" class="text-sm font-bold text-slate-200 mt-0.5">?뺤씤 以?..</div>
+            <div class="text-xs text-slate-400">미국 정규 증시 (NYSE/NASDAQ)</div>
+            <div id="usMainText" class="text-sm font-bold text-slate-200 mt-0.5">확인 중...</div>
           </div>
           <div id="usMainBadge" class="p-2 rounded-lg bg-slate-800 text-slate-400">
             <i class="fa-solid fa-spinner fa-spin"></i>
@@ -154,7 +154,7 @@
       </div>
     </div>
 
-    <!-- Section 1: ?붾젅洹몃옩 ?ㅼ쨷 Bot ?곕룞 愿由?-->
+    <!-- Section 1: 텔레그램 다중 Bot 연동 관리 -->
     <section class="glass-card rounded-2xl p-6 glass-card-hover">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-700/60 pb-4 mb-5 gap-3">
         <div class="flex items-center gap-2.5">
@@ -163,36 +163,36 @@
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h2 class="text-lg font-bold text-white font-display">?붾젅洹몃옩 Bot ?곕룞 愿由?/h2>
-              <span id="botCountBadge" class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">1媛??깅줉??/span>
+              <h2 class="text-lg font-bold text-white font-display">텔레그램 Bot 연동 관리</h2>
+              <span id="botCountBadge" class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">1개 등록됨</span>
             </div>
-            <p class="text-xs text-slate-400 mt-0.5">?뚮┝???섏떊??Telegram Bot 諛?Chat ID瑜??щ윭 媛??깅줉?섏뿬 ?숈떆??由ы룷?몃? ?꾩넚?????덉뒿?덈떎.</p>
+            <p class="text-xs text-slate-400 mt-0.5">알림을 수신할 Telegram Bot 및 Chat ID를 여러 개 등록하여 동시에 리포트를 전송할 수 있습니다.</p>
           </div>
         </div>
         <button type="button" onclick="addTelegramBot()" class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-sky-600/20 transition cursor-pointer">
           <i class="fa-solid fa-plus"></i>
-          <span>??遊?異붽?</span>
+          <span>새 봇 추가</span>
         </button>
       </div>
 
-      <!-- 遊?紐⑸줉 ?숈쟻 而⑦뀒?대꼫 -->
+      <!-- 봇 목록 동적 컨테이너 -->
       <div id="telegramBotsContainer" class="space-y-4">
-        <!-- JS濡??숈쟻 ?뚮뜑留???-->
+        <!-- JS로 동적 렌더링 됨 -->
       </div>
 
-      <!-- ?섎떒 ?덈궡 & ?꾩껜 ?뚯뒪??踰꾪듉 -->
+      <!-- 하단 안내 & 전체 테스트 버튼 -->
       <div class="mt-5 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-800">
         <p class="text-xs text-slate-400">
-          <i class="fa-solid fa-circle-info text-blue-400 mr-1"></i> 遊??뺣낫 蹂寃????섎떒??<b>[?ㅼ젙 ???</b> 踰꾪듉???꾨Ⅴ硫??덉쟾?섍쾶 蹂닿??⑸땲??
+          <i class="fa-solid fa-circle-info text-blue-400 mr-1"></i> 봇 정보 변경 후 하단의 <b>[설정 저장]</b> 버튼을 누르면 안전하게 보관됩니다.
         </p>
         <button id="btnTestAllTelegram" onclick="handleTestAllTelegram()" class="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-sky-200 border border-slate-700 hover:border-sky-500/50 font-medium text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer">
           <i class="fa-solid fa-paper-plane"></i>
-          <span>?쒖꽦 遊??꾩껜 ?뚯뒪??諛쒖넚</span>
+          <span>활성 봇 전체 테스트 발송</span>
         </button>
       </div>
     </section>
 
-    <!-- Section 2: 諛쒖넚 ????쒖옣 諛?留덇컧 ?몄뀡 ?좏깮 (?낅┰ ?ㅼ쨷 泥댄겕諛뺤뒪) -->
+    <!-- Section 2: 발송 대상 시장 및 마감 세션 선택 (독립 다중 체크박스) -->
     <section class="glass-card rounded-2xl p-6 glass-card-hover">
       <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-5">
         <div class="flex items-center gap-2.5">
@@ -200,8 +200,8 @@
             <i class="fa-solid fa-clock text-xl"></i>
           </div>
           <div>
-            <h2 class="text-lg font-bold text-white font-display">諛쒖넚 ????쒖옣 諛?留덇컧 ?몄뀡 ?좏깮</h2>
-            <p class="text-xs text-slate-400 mt-0.5">?먰븯???몄뀡??泥댄겕????[?ㅼ?以??몃━嫄??숆린?? 踰꾪듉???뚮윭 ?ㅼ?以꾩쓣 ?낅뜲?댄듃?⑸땲??</p>
+            <h2 class="text-lg font-bold text-white font-display">발송 대상 시장 및 마감 세션 선택</h2>
+            <p class="text-xs text-slate-400 mt-0.5">원하는 세션을 체크한 후 [스케줄 트리거 동기화] 버튼을 눌러 스케줄을 업데이트합니다.</p>
           </div>
         </div>
       </div>
@@ -210,31 +210,31 @@
         <!-- KRX Regular -->
         <label class="relative flex flex-col p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition select-none">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-sky-400 px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20">?됱씪 15:40 KST</span>
+            <span class="text-xs font-bold text-sky-400 px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20">평일 15:40 KST</span>
             <input type="checkbox" id="krxMain" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
           </div>
-          <div class="font-bold text-sm text-slate-200">援?궡 ?뺢퇋??留덇컧 由ы룷??/div>
-          <div class="text-xs text-slate-400 mt-1">KOSPI & KOSDAQ ?쒓?珥앹븸 ?곸쐞 醫낅ぉ 蹂??遺꾩꽍</div>
+          <div class="font-bold text-sm text-slate-200">국내 정규장 마감 리포트</div>
+          <div class="text-xs text-slate-400 mt-1">KOSPI &amp; KOSDAQ 시가총액 상위 종목 변동 분석</div>
         </label>
 
         <!-- KRX NXT -->
         <label class="relative flex flex-col p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition select-none">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-purple-400 px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">?됱씪 20:10 KST</span>
+            <span class="text-xs font-bold text-purple-400 px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">평일 20:10 KST</span>
             <input type="checkbox" id="krxNxt" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
           </div>
-          <div class="font-bold text-slate-200 text-sm">援?궡 ?쇨컙?泥닿굅?섏냼(NXT) 留덇컧</div>
-          <div class="text-xs text-slate-400 mt-1">20:00 留덇컧 ???쇨컙 嫄곕옒 諛섏쁺 ?쒖킑 蹂??遺꾩꽍</div>
+          <div class="font-bold text-slate-200 text-sm">국내 야간대체거래소(NXT) 마감</div>
+          <div class="text-xs text-slate-400 mt-1">20:00 마감 후 야간 거래 반영 시총 변동 분석</div>
         </label>
 
         <!-- US Regular -->
         <label class="relative flex flex-col p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition select-none">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">????06:10 KST</span>
+            <span class="text-xs font-bold text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">화~토 06:10 KST</span>
             <input type="checkbox" id="usMain" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
           </div>
-          <div class="font-bold text-slate-200 text-sm">誘멸뎅 利앹떆 留덇컧 由ы룷??/div>
-          <div class="text-xs text-slate-400 mt-1">NYSE & NASDAQ ?쒓?珥앹븸 ?곸쐞 蹂??遺꾩꽍</div>
+          <div class="font-bold text-slate-200 text-sm">미국 증시 마감 리포트</div>
+          <div class="text-xs text-slate-400 mt-1">NYSE &amp; NASDAQ 시가총액 상위 변동 분석</div>
         </label>
       </div>
 
@@ -245,15 +245,15 @@
             <i class="fa-solid fa-calendar-xmark"></i>
           </div>
           <div>
-            <div class="text-xs font-bold text-slate-200">怨듯쑕??諛??댁옣???먮룞 諛쒖넚 嫄대꼫?곌린</div>
-            <div class="text-xs text-slate-400">?쒓뎅/誘멸뎅 ?댁옣???좎젙, ?ㅻ궇, 異붿꽍, ?낅┰湲곕뀗?? ?깊깂?????먮뒗 ?뚮┝??諛쒖넚?섏? ?딆뒿?덈떎.</div>
+            <div class="text-xs font-bold text-slate-200">공휴일 및 휴장일 자동 발송 건너뛰기</div>
+            <div class="text-xs text-slate-400">한국/미국 휴장일(신정, 설날, 추석, 독립기념일, 성탄절 등)에는 알림을 발송하지 않습니다.</div>
           </div>
         </div>
         <input type="checkbox" id="skipHolidays" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
       </div>
     </section>
 
-    <!-- Section 3: 由ы룷??異쒕젰 ?щ㎎ & 遺꾩꽍 ?듭뀡 -->
+    <!-- Section 3: 리포트 출력 포맷 & 분석 옵션 -->
     <section class="glass-card rounded-2xl p-6 glass-card-hover">
       <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-5">
         <div class="flex items-center gap-2.5">
@@ -261,8 +261,8 @@
             <i class="fa-solid fa-sliders text-xl"></i>
           </div>
           <div>
-            <h2 class="text-lg font-bold text-white font-display">由ы룷??異쒕젰 ?щ㎎ & 遺꾩꽍 ?듭뀡</h2>
-            <p class="text-xs text-slate-400 mt-0.5">?붾젅洹몃옩 硫붿떆吏???ы븿??遺꾩꽍 ??ぉ 諛??덉씠?꾩썐??留욎땄 ?ㅼ젙?⑸땲??</p>
+            <h2 class="text-lg font-bold text-white font-display">리포트 출력 포맷 &amp; 분석 옵션</h2>
+            <p class="text-xs text-slate-400 mt-0.5">텔레그램 메시지에 포함할 분석 항목 및 레이아웃을 맞춤 설정합니다.</p>
           </div>
         </div>
       </div>
@@ -271,41 +271,41 @@
         <!-- Top N Selection -->
         <div>
           <label for="topN" class="block text-xs font-semibold text-slate-300 mb-2">
-            ?쒓?珥앹븸 ?곸쐞 異쒕젰 醫낅ぉ ??(Top N)
+            시가총액 상위 출력 종목 수 (Top N)
           </label>
           <select id="topN" class="w-full sm:w-64 px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-blue-500 transition cursor-pointer">
-            <option value="10">Top 10 醫낅ぉ</option>
-            <option value="20" selected>Top 20 醫낅ぉ (沅뚯옣)</option>
-            <option value="30">Top 30 醫낅ぉ</option>
-            <option value="50">Top 50 醫낅ぉ</option>
+            <option value="10">Top 10 종목</option>
+            <option value="20" selected>Top 20 종목 (권장)</option>
+            <option value="30">Top 30 종목</option>
+            <option value="50">Top 50 종목</option>
           </select>
         </div>
 
         <!-- Period Compare Checkboxes -->
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-2">
-            鍮꾧탳 ???怨쇨굅 湲곌컙 ?좏깮 (蹂듭닔 ?좏깮 媛??
+            비교 대상 과거 기간 선택 (복수 선택 가능)
           </label>
           <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="compare1d" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
-              <span class="text-xs font-semibold text-slate-200">1????(?꾩씪)</span>
+              <span class="text-xs font-semibold text-slate-200">1일 전 (전일)</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="compare5d" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
-              <span class="text-xs font-semibold text-slate-200">5????(1二쇱씪)</span>
+              <span class="text-xs font-semibold text-slate-200">5일 전 (1주일)</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="compare1m" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
-              <span class="text-xs font-semibold text-slate-200">1媛쒖썡 ??/span>
+              <span class="text-xs font-semibold text-slate-200">1개월 전</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="compare3m" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
-              <span class="text-xs font-semibold text-slate-200">3媛쒖썡 ??/span>
+              <span class="text-xs font-semibold text-slate-200">3개월 전</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="compare1y" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
-              <span class="text-xs font-semibold text-slate-200">1????/span>
+              <span class="text-xs font-semibold text-slate-200">1년 전</span>
             </label>
           </div>
         </div>
@@ -313,35 +313,35 @@
         <!-- Additional Detail Options -->
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-2">
-            由ы룷???곸꽭 ?쒖떇 ?듭뀡
+            리포트 상세 서식 옵션
           </label>
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="showPastCap" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
-              <span class="text-xs text-slate-200">怨쇨굅 ?쒓?珥앹븸 湲덉븸 ?쒓린</span>
+              <span class="text-xs text-slate-200">과거 시가총액 금액 표기</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="showChangePercent" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
-              <span class="text-xs text-slate-200">?쒖킑 蹂?숇쪧 (%) ?쒓린</span>
+              <span class="text-xs text-slate-200">시총 변동률 (%) 표기</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="showIcons" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
-              <span class="text-xs text-slate-200">?깅씫 ?꾩씠肄?(?뵼/?뵽/?? ?쒓린</span>
+              <span class="text-xs text-slate-200">등락 아이콘 (🔺/🔻/➖) 표기</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="showLinks" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
-              <span class="text-xs text-slate-200">醫낅ぉ ?ㅼ씠踰꾩쬆沅??쇳썑 ?뚯씠?몄뒪 留곹겕 泥⑤?</span>
+              <span class="text-xs text-slate-200">종목 네이버증권/야후 파이낸스 링크 첨부</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none sm:col-span-2">
               <input type="checkbox" id="includeAnalystSummary" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
-              <span class="text-xs font-semibold text-sky-400">?뮕 ?섍툒 諛?蹂?숈꽦 ?듭떖 ?붿빟 ?뱀뀡 ?먮룞 泥⑤?</span>
+              <span class="text-xs font-semibold text-sky-400">💡 수급 및 변동성 핵심 요약 섹션 자동 첨부</span>
             </label>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Section 4: ?ㅼ떆媛?由ы룷??誘몃━蹂닿린 & ?섎룞 利됱떆 諛쒖넚 -->
+    <!-- Section 4: 실시간 리포트 미리보기 & 수동 즉시 발송 -->
     <section class="glass-card rounded-2xl p-6 glass-card-hover">
       <div class="flex items-center justify-between border-b border-slate-700/60 pb-4 mb-5">
         <div class="flex items-center gap-2.5">
@@ -349,8 +349,8 @@
             <i class="fa-solid fa-eye text-xl"></i>
           </div>
           <div>
-            <h2 class="text-lg font-bold text-white font-display">?ㅼ떆媛?由ы룷??誘몃━蹂닿린 & 利됱떆 諛쒖넚</h2>
-            <p class="text-xs text-slate-400 mt-0.5">?꾩옱 ?쒖젏???곗씠?곕? ?섏쭛?섏뿬 ?붾젅洹몃옩 硫붿떆吏 ?뺥깭瑜?誘몃━ ?뺤씤?섍퀬 利됱떆 諛쒖넚?⑸땲??</p>
+            <h2 class="text-lg font-bold text-white font-display">실시간 리포트 미리보기 &amp; 즉시 발송</h2>
+            <p class="text-xs text-slate-400 mt-0.5">현재 시점의 데이터를 수집하여 텔레그램 메시지 형태를 미리 확인하고 즉시 발송합니다.</p>
           </div>
         </div>
       </div>
@@ -359,22 +359,22 @@
         <button type="button" id="btnPreviewKrxMain" onclick="handlePreviewReport('krxMain', 'btnPreviewKrxMain')"
                 class="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-sky-500/40 transition flex flex-col items-center justify-center gap-2 text-center group cursor-pointer">
           <i class="fa-solid fa-chart-pie text-sky-400 text-2xl group-hover:scale-110 transition"></i>
-          <span class="font-bold text-sm text-slate-200">援?궡 ?뺢퇋??由ы룷??/span>
-          <span class="text-[11px] text-slate-400">誘몃━蹂닿린 & 利됱떆 諛쒖넚</span>
+          <span class="font-bold text-sm text-slate-200">국내 정규장 리포트</span>
+          <span class="text-[11px] text-slate-400">미리보기 &amp; 즉시 발송</span>
         </button>
 
         <button type="button" id="btnPreviewKrxNxt" onclick="handlePreviewReport('krxNxt', 'btnPreviewKrxNxt')"
-                class="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:purple-500/40 transition flex flex-col items-center justify-center gap-2 text-center group cursor-pointer">
+                class="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-purple-500/40 transition flex flex-col items-center justify-center gap-2 text-center group cursor-pointer">
           <i class="fa-solid fa-moon text-purple-400 text-2xl group-hover:scale-110 transition"></i>
-          <span class="font-bold text-sm text-slate-200">援?궡 ?쇨컙 NXT??由ы룷??/span>
-          <span class="text-[11px] text-slate-400">誘몃━蹂닿린 & 利됱떆 諛쒖넚</span>
+          <span class="font-bold text-sm text-slate-200">국내 야간 NXT장 리포트</span>
+          <span class="text-[11px] text-slate-400">미리보기 &amp; 즉시 발송</span>
         </button>
 
         <button type="button" id="btnPreviewUsMain" onclick="handlePreviewReport('usMain', 'btnPreviewUsMain')"
                 class="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/40 transition flex flex-col items-center justify-center gap-2 text-center group cursor-pointer">
           <i class="fa-solid fa-globe text-emerald-400 text-2xl group-hover:scale-110 transition"></i>
-          <span class="font-bold text-sm text-slate-200">誘멸뎅 ?뺢퇋 利앹떆 由ы룷??/span>
-          <span class="text-[11px] text-slate-400">誘몃━蹂닿린 & 利됱떆 諛쒖넚</span>
+          <span class="font-bold text-sm text-slate-200">미국 정규 증시 리포트</span>
+          <span class="text-[11px] text-slate-400">미리보기 &amp; 즉시 발송</span>
         </button>
       </div>
     </section>
@@ -386,19 +386,19 @@
     <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
       <div class="text-xs text-slate-400 hidden sm:flex items-center gap-2">
         <i class="fa-solid fa-shield-halved text-sky-400"></i>
-        <span>?ㅼ젙 蹂寃???諛섎뱶??<b>[?ㅼ?以??몃━嫄??숆린??</b>瑜??뚮윭???먮룞 ?ㅼ?以꾩뿉 諛섏쁺?⑸땲??</span>
+        <span>설정 변경 후 반드시 <b>[스케줄 트리거 동기화]</b>를 눌러야 자동 스케줄에 반영됩니다.</span>
       </div>
       <div class="flex items-center gap-3 w-full sm:w-auto">
         <button type="button" id="btnSave" onclick="handleSaveSettings()"
                 class="flex-1 sm:flex-initial px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs sm:text-sm rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer shadow">
           <i class="fa-solid fa-floppy-disk text-sky-400"></i>
-          <span>?뮶 ?ㅼ젙 ???(?⑤룆)</span>
+          <span>💾 설정 저장 (단독)</span>
         </button>
 
         <button type="button" id="btnSyncTriggers" onclick="handleSyncTriggers()"
                 class="flex-1 sm:flex-initial px-5 py-2.5 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-sky-600/30 transition flex items-center justify-center gap-2 cursor-pointer">
           <i class="fa-solid fa-clock"></i>
-          <span>???ㅼ?以??몃━嫄??숆린??/span>
+          <span>⏰ 스케줄 트리거 동기화</span>
         </button>
       </div>
     </div>
@@ -410,11 +410,11 @@
       <!-- Modal Header -->
       <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
         <div>
-          <h3 id="modalTitle" class="text-base font-bold text-white">由ы룷??誘몃━蹂닿린</h3>
-          <p id="modalSubtitle" class="text-xs text-slate-400">?ㅼ떆媛??곗씠???섏쭛 寃곌낵</p>
+          <h3 id="modalTitle" class="text-base font-bold text-white">리포트 미리보기</h3>
+          <p id="modalSubtitle" class="text-xs text-slate-400">실시간 데이터 수집 결과</p>
         </div>
         <div class="flex items-center gap-2">
-          <span id="modalCharBadge" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 font-mono">0??/span>
+          <span id="modalCharBadge" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 font-mono">0자</span>
           <button type="button" onclick="closePreviewModal()" class="p-1.5 text-slate-400 hover:text-white rounded-lg transition cursor-pointer">
             <i class="fa-solid fa-xmark text-lg"></i>
           </button>
@@ -424,9 +424,10 @@
       <!-- Modal Tabs -->
       <div class="px-6 pt-3 border-b border-slate-800 flex items-center gap-2">
         <button type="button" id="tabRenderBtn" onclick="switchPreviewTab('render')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-600 text-white cursor-pointer">
-          ?벑 ?붾젅洹몃옩 ?뚮뜑留?酉?        </button>
+          📱 텔레그램 렌더링 뷰
+        </button>
         <button type="button" id="tabRawBtn" onclick="switchPreviewTab('raw')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer">
-          ?뱞 Telegram HTML ?먮Ц
+          📄 Telegram HTML 원문
         </button>
       </div>
 
@@ -442,15 +443,15 @@
       <div class="px-6 py-4 border-t border-slate-800 bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
         <button type="button" onclick="copyPreviewText()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
           <i class="fa-regular fa-copy"></i>
-          <span>硫붿떆吏 蹂듭궗</span>
+          <span>메시지 복사</span>
         </button>
         <div class="flex items-center gap-2">
           <button type="button" onclick="closePreviewModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer">
-            ?リ린
+            닫기
           </button>
           <button type="button" onclick="sendModalReport()" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-sky-600/20 cursor-pointer">
             <i class="fa-solid fa-paper-plane"></i>
-            <span>?깅줉??紐⑤뱺 ?쒖꽦 遊뉗쑝濡?利됱떆 諛쒖넚</span>
+            <span>등록된 모든 활성 봇으로 즉시 발송</span>
           </button>
         </div>
       </div>
@@ -471,7 +472,7 @@
     });
 
     function loadInitialSettings() {
-      showStatus('loading', '?ㅼ젙 遺덈윭?ㅻ뒗 以?..');
+      showStatus('loading', '설정 불러오는 중...');
       google.script.run
         .withSuccessHandler(onSettingsLoaded)
         .withFailureHandler(onApiError)
@@ -489,48 +490,48 @@
 
     function onMarketStatusLoaded(status) {
       if (!status) return;
-      document.getElementById('marketTodayDate').innerText = `${status.today} KST 湲곗?`;
+      document.getElementById('marketTodayDate').innerText = (status.today || '') + ' KST 기준';
       
       const krxMainText = document.getElementById('krxMainText');
       const krxMainBadge = document.getElementById('krxMainBadge');
-      if (status.krxMain.isOpen) {
+      if (status.krxMain && status.krxMain.isOpen) {
         krxMainBadge.className = 'p-2 rounded-lg bg-emerald-500/10 text-emerald-400';
         krxMainBadge.innerHTML = '<i class="fa-solid fa-door-open"></i>';
         krxMainText.className = 'text-sm font-bold text-emerald-400';
-        krxMainText.innerText = `?뺢퇋 媛쒖옣 (${status.krxMain.dayOfWeek}?붿씪)`;
+        krxMainText.innerText = '정규 개장 (' + status.krxMain.dayOfWeek + '요일)';
       } else {
         krxMainBadge.className = 'p-2 rounded-lg bg-amber-500/10 text-amber-400';
         krxMainBadge.innerHTML = '<i class="fa-solid fa-door-closed"></i>';
         krxMainText.className = 'text-sm font-bold text-amber-400';
-        krxMainText.innerText = `?댁옣 (${status.krxMain.reason})`;
+        krxMainText.innerText = '휴장 (' + (status.krxMain ? status.krxMain.reason : '휴장일') + ')';
       }
 
       const krxNxtText = document.getElementById('krxNxtText');
       const krxNxtBadge = document.getElementById('krxNxtBadge');
-      if (status.krxNxt.isOpen) {
+      if (status.krxNxt && status.krxNxt.isOpen) {
         krxNxtBadge.className = 'p-2 rounded-lg bg-purple-500/10 text-purple-400';
         krxNxtBadge.innerHTML = '<i class="fa-solid fa-door-open"></i>';
         krxNxtText.className = 'text-sm font-bold text-purple-400';
-        krxNxtText.innerText = `?쇨컙 嫄곕옒 (${status.krxNxt.dayOfWeek}?붿씪)`;
+        krxNxtText.innerText = '야간 거래 (' + status.krxNxt.dayOfWeek + '요일)';
       } else {
         krxNxtBadge.className = 'p-2 rounded-lg bg-amber-500/10 text-amber-400';
         krxNxtBadge.innerHTML = '<i class="fa-solid fa-door-closed"></i>';
         krxNxtText.className = 'text-sm font-bold text-amber-400';
-        krxNxtText.innerText = `?댁옣 (${status.krxNxt.reason})`;
+        krxNxtText.innerText = '휴장 (' + (status.krxNxt ? status.krxNxt.reason : '휴장일') + ')';
       }
 
       const usMainText = document.getElementById('usMainText');
       const usMainBadge = document.getElementById('usMainBadge');
-      if (status.us.isOpen) {
+      if (status.us && status.us.isOpen) {
         usMainBadge.className = 'p-2 rounded-lg bg-emerald-500/10 text-emerald-400';
         usMainBadge.innerHTML = '<i class="fa-solid fa-door-open"></i>';
         usMainText.className = 'text-sm font-bold text-emerald-400';
-        usMainText.innerText = `?뺢퇋 媛쒖옣 (${status.us.dayOfWeek}?붿씪)`;
+        usMainText.innerText = '정규 개장 (' + status.us.dayOfWeek + '요일)';
       } else {
         usMainBadge.className = 'p-2 rounded-lg bg-amber-500/10 text-amber-400';
         usMainBadge.innerHTML = '<i class="fa-solid fa-door-closed"></i>';
         usMainText.className = 'text-sm font-bold text-amber-400';
-        usMainText.innerText = `?댁옣 (${status.us.reason})`;
+        usMainText.innerText = '휴장 (' + (status.us ? status.us.reason : '휴장일') + ')';
       }
     }
 
@@ -538,7 +539,7 @@
       if (Array.isArray(bots) && bots.length > 0) {
         telegramBotsList = JSON.parse(JSON.stringify(bots));
       } else if (telegramBotsList.length === 0) {
-        telegramBotsList = [{ id: 'bot_1', name: '湲곕낯 遊?, token: '', chatId: '', enabled: true }];
+        telegramBotsList = [{ id: 'bot_1', name: '기본 봇', token: '', chatId: '', enabled: true }];
       }
       
       const container = document.getElementById('telegramBotsContainer');
@@ -547,74 +548,74 @@
       const badge = document.getElementById('botCountBadge');
       if (badge) {
         const enabledCount = telegramBotsList.filter(b => b.enabled !== false).length;
-        badge.innerText = `${telegramBotsList.length}媛??깅줉??(${enabledCount}媛??쒖꽦)`;
+        badge.innerText = telegramBotsList.length + '개 등록됨 (' + enabledCount + '개 활성)';
       }
 
       telegramBotsList.forEach((bot, index) => {
-        const botId = bot.id || `bot_${index + 1}`;
+        const botId = bot.id || ('bot_' + (index + 1));
         const botCard = document.createElement('div');
-        botCard.id = `botCard_${botId}`;
+        botCard.id = 'botCard_' + botId;
         const isEnabled = bot.enabled !== false;
-        botCard.className = `p-4 rounded-xl border transition-all ${isEnabled ? 'bg-slate-900/80 border-slate-700/80' : 'bg-slate-900/40 border-slate-800/80 opacity-70'} space-y-3.5`;
+        botCard.className = 'p-4 rounded-xl border transition-all ' + (isEnabled ? 'bg-slate-900/80 border-slate-700/80' : 'bg-slate-900/40 border-slate-800/80 opacity-70') + ' space-y-3.5';
         
-        botCard.innerHTML = `
-          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
-            <div class="flex items-center gap-2 flex-1 min-w-[200px]">
-              <span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0">
-                ?쨼 遊?#${index + 1}
-              </span>
-              <input type="text" id="botName_${botId}" value="${escapeHtml(bot.name || '')}" placeholder="遊?蹂꾩묶 (?? 媛쒖씤 ?뚮┝, ?댁쁺 梨꾨꼸)"
-                     onchange="updateBotField('${botId}', 'name', this.value)"
-                     class="px-2.5 py-1 bg-slate-800/90 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 flex-1 max-w-[260px]">
-            </div>
-            <div class="flex items-center gap-3">
-              <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-300 select-none">
-                <input type="checkbox" id="botEnabled_${botId}" ${isEnabled ? 'checked' : ''}
-                       onchange="toggleBotEnabled('${botId}', this.checked)"
-                       class="w-4 h-4 rounded text-sky-600 bg-slate-800 border-slate-700 focus:ring-0 focus:ring-offset-0">
-                <span>諛쒖넚 ?쒖꽦??/span>
-              </label>
-              ${telegramBotsList.length > 1 ? `
-                <button type="button" onclick="removeTelegramBot('${botId}')" title="遊???젣" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition text-xs cursor-pointer">
-                  <i class="fa-solid fa-trash-can"></i>
-                </button>
-              ` : ''}
-            </div>
-          </div>
+        let deleteBtnHtml = '';
+        if (telegramBotsList.length > 1) {
+          deleteBtnHtml = '<button type="button" onclick="removeTelegramBot(\'' + botId + '\')" title="봇 삭제" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition text-xs cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>';
+        }
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            <div class="space-y-1">
-              <label class="block text-[11px] font-semibold text-slate-300">
-                Bot Token <span class="text-rose-400">*</span>
-              </label>
-              <div class="relative">
-                <input type="password" id="botToken_${botId}" value="${escapeHtml(bot.token || '')}" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                       onchange="updateBotField('${botId}', 'token', this.value)"
-                       class="w-full pl-3 pr-9 py-2 bg-slate-950/70 border border-slate-700/80 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 font-mono transition">
-                <button type="button" onclick="togglePasswordVisibility('botToken_${botId}', 'tokenEye_${botId}')" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200">
-                  <i id="tokenEye_${botId}" class="fa-regular fa-eye text-xs"></i>
-                </button>
-              </div>
-            </div>
+        botCard.innerHTML = 
+          '<div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">' +
+            '<div class="flex items-center gap-2 flex-1 min-w-[200px]">' +
+              '<span class="px-2 py-0.5 rounded-lg text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0">' +
+                '🤖 봇 #' + (index + 1) +
+              '</span>' +
+              '<input type="text" id="botName_' + botId + '" value="' + escapeHtml(bot.name || '') + '" placeholder="봇 별칭 (예: 개인 알림, 운영 채널)"' +
+                     'onchange="updateBotField(\'' + botId + '\', \'name\', this.value)"' +
+                     'class="px-2.5 py-1 bg-slate-800/90 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 flex-1 max-w-[260px]">' +
+            '</div>' +
+            '<div class="flex items-center gap-3">' +
+              '<label class="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-300 select-none">' +
+                '<input type="checkbox" id="botEnabled_' + botId + '" ' + (isEnabled ? 'checked' : '') + ' ' +
+                       'onchange="toggleBotEnabled(\'' + botId + '\', this.checked)"' +
+                       'class="w-4 h-4 rounded text-sky-600 bg-slate-800 border-slate-700 focus:ring-0 focus:ring-offset-0">' +
+                '<span>발송 활성화</span>' +
+              '</label>' +
+              deleteBtnHtml +
+            '</div>' +
+          '</div>' +
 
-            <div class="space-y-1">
-              <label class="block text-[11px] font-semibold text-slate-300">
-                Chat ID (媛쒖씤 / 梨꾨꼸 ID) <span class="text-rose-400">*</span>
-              </label>
-              <input type="text" id="botChatId_${botId}" value="${escapeHtml(bot.chatId || '')}" placeholder="?? 987654321 ?먮뒗 -100123456789"
-                     onchange="updateBotField('${botId}', 'chatId', this.value)"
-                     class="w-full px-3 py-2 bg-slate-950/70 border border-slate-700/80 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 font-mono transition">
-            </div>
-          </div>
+          '<div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">' +
+            '<div class="space-y-1">' +
+              '<label class="block text-[11px] font-semibold text-slate-300">' +
+                'Bot Token <span class="text-rose-400">*</span>' +
+              '</label>' +
+              '<div class="relative">' +
+                '<input type="password" id="botToken_' + botId + '" value="' + escapeHtml(bot.token || '') + '" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"' +
+                       'onchange="updateBotField(\'' + botId + '\', \'token\', this.value)"' +
+                       'class="w-full pl-3 pr-9 py-2 bg-slate-950/70 border border-slate-700/80 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 font-mono transition">' +
+                '<button type="button" onclick="togglePasswordVisibility(\'botToken_' + botId + '\', \'tokenEye_' + botId + '\')" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200 cursor-pointer">' +
+                  '<i id="tokenEye_' + botId + '" class="fa-regular fa-eye text-xs"></i>' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
 
-          <div class="flex items-center justify-end pt-1">
-            <button type="button" id="btnTestBot_${botId}" onclick="handleTestSingleBot('${botId}')"
-                    class="px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 hover:text-sky-100 border border-sky-500/30 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 cursor-pointer">
-              <i class="fa-solid fa-paper-plane text-[10px]"></i>
-              <span>??遊뉗쑝濡??뚯뒪??諛쒖넚</span>
-            </button>
-          </div>
-        `;
+            '<div class="space-y-1">' +
+              '<label class="block text-[11px] font-semibold text-slate-300">' +
+                'Chat ID (개인 / 채널 ID) <span class="text-rose-400">*</span>' +
+              '</label>' +
+              '<input type="text" id="botChatId_' + botId + '" value="' + escapeHtml(bot.chatId || '') + '" placeholder="예: 987654321 또는 -100123456789"' +
+                     'onchange="updateBotField(\'' + botId + '\', \'chatId\', this.value)"' +
+                     'class="w-full px-3 py-2 bg-slate-950/70 border border-slate-700/80 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 font-mono transition">' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="flex items-center justify-end pt-1">' +
+            '<button type="button" id="btnTestBot_' + botId + '" onclick="handleTestSingleBot(\'' + botId + '\')"' +
+                    'class="px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 hover:text-sky-100 border border-sky-500/30 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 cursor-pointer">' +
+              '<i class="fa-solid fa-paper-plane text-[10px]"></i>' +
+              '<span>이 봇으로 테스트 발송</span>' +
+            '</button>' +
+          '</div>';
         
         container.appendChild(botCard);
       });
@@ -622,10 +623,10 @@
 
     function syncStateFromDom() {
       telegramBotsList = telegramBotsList.map(bot => {
-        const nameEl = document.getElementById(`botName_${bot.id}`);
-        const tokenEl = document.getElementById(`botToken_${bot.id}`);
-        const chatIdEl = document.getElementById(`botChatId_${bot.id}`);
-        const enabledEl = document.getElementById(`botEnabled_${bot.id}`);
+        const nameEl = document.getElementById('botName_' + bot.id);
+        const tokenEl = document.getElementById('botToken_' + bot.id);
+        const chatIdEl = document.getElementById('botChatId_' + bot.id);
+        const enabledEl = document.getElementById('botEnabled_' + bot.id);
         return {
           id: bot.id,
           name: nameEl ? nameEl.value.trim() : (bot.name || ''),
@@ -648,7 +649,7 @@
       if (b) {
         b.enabled = isChecked;
       }
-      const card = document.getElementById(`botCard_${botId}`);
+      const card = document.getElementById('botCard_' + botId);
       if (card) {
         if (isChecked) {
           card.className = 'p-4 rounded-xl border transition-all bg-slate-900/80 border-slate-700/80 space-y-3.5';
@@ -659,7 +660,7 @@
       const badge = document.getElementById('botCountBadge');
       if (badge) {
         const enabledCount = telegramBotsList.filter(item => item.enabled !== false).length;
-        badge.innerText = `${telegramBotsList.length}媛??깅줉??(${enabledCount}媛??쒖꽦)`;
+        badge.innerText = telegramBotsList.length + '개 등록됨 (' + enabledCount + '개 활성)';
       }
     }
 
@@ -668,25 +669,25 @@
       const newIndex = telegramBotsList.length + 1;
       const newBot = {
         id: 'bot_' + Date.now(),
-        name: `遊?${newIndex}`,
+        name: '봇 ' + newIndex,
         token: '',
         chatId: '',
         enabled: true
       };
       telegramBotsList.push(newBot);
       renderTelegramBots(telegramBotsList);
-      showToast('info', '遊?異붽?', `?덈줈??遊?#${newIndex} ??ぉ??異붽??섏뿀?듬땲?? ?좏겙怨?Chat ID瑜??낅젰?섏꽭??`);
+      showToast('info', '봇 추가', '새로운 봇 #' + newIndex + ' 항목이 추가되었습니다. 토큰과 Chat ID를 입력하세요.');
     }
 
     function removeTelegramBot(botId) {
       syncStateFromDom();
       if (telegramBotsList.length <= 1) {
-        showToast('warning', '??젣 遺덇?', '理쒖냼 1媛쒖쓽 遊??ㅼ젙???좎??섏뼱???⑸땲??');
+        showToast('warning', '삭제 불가', '최소 1개의 봇 설정이 유지되어야 합니다.');
         return;
       }
       telegramBotsList = telegramBotsList.filter(b => b.id !== botId);
       renderTelegramBots(telegramBotsList);
-      showToast('info', '遊???젣', '?좏깮??遊뉗씠 紐⑸줉?먯꽌 ??젣?섏뿀?듬땲??');
+      showToast('info', '봇 삭제', '선택한 봇이 목록에서 삭제되었습니다.');
     }
 
     function handleTestSingleBot(botId) {
@@ -696,27 +697,27 @@
       
       const token = bot.token.trim();
       const chatId = bot.chatId.trim();
-      const botName = bot.name.trim() || '遊?;
+      const botName = bot.name.trim() || '봇';
       
       if (!token || !chatId) {
-        showToast('warning', '?낅젰 ?뺤씤', `[${botName}]??Bot Token怨?Chat ID瑜?紐⑤몢 ?낅젰?댁＜?몄슂.`);
+        showToast('warning', '입력 확인', '[' + botName + ']의 Bot Token과 Chat ID를 모두 입력해주세요.');
         return;
       }
       
-      const btn = document.getElementById(`btnTestBot_${botId}`);
-      setButtonLoading(btn, true, '諛쒖넚 以?..');
+      const btn = document.getElementById('btnTestBot_' + botId);
+      setButtonLoading(btn, true, '발송 중...');
       
       google.script.run
         .withSuccessHandler((res) => {
-          setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane text-[10px] mr-1"></i> ??遊뉗쑝濡??뚯뒪??諛쒖넚');
+          setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane text-[10px] mr-1"></i> 이 봇으로 테스트 발송');
           if (res.success) {
-            showToast('success', '?뚯뒪???깃났', res.message);
+            showToast('success', '테스트 성공', res.message);
           } else {
-            showToast('error', '諛쒖넚 ?ㅽ뙣', res.message);
+            showToast('error', '발송 실패', res.message);
           }
         })
         .withFailureHandler((err) => {
-          setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane text-[10px] mr-1"></i> ??遊뉗쑝濡??뚯뒪??諛쒖넚');
+          setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane text-[10px] mr-1"></i> 이 봇으로 테스트 발송');
           onApiError(err);
         })
         .testTelegram(token, chatId, botName);
@@ -727,12 +728,12 @@
       const activeBots = telegramBotsList.filter(b => b.enabled !== false && b.token && b.chatId);
       
       if (activeBots.length === 0) {
-        showToast('warning', '諛쒖넚 ????놁쓬', '?쒖꽦?붾릺怨??좏겙 諛?Chat ID媛 ?낅젰??遊뉗씠 ?놁뒿?덈떎.');
+        showToast('warning', '발송 대상 없음', '활성화되고 토큰 및 Chat ID가 입력된 봇이 없습니다.');
         return;
       }
       
       const btn = document.getElementById('btnTestAllTelegram');
-      setButtonLoading(btn, true, `?꾩껜 ${activeBots.length}媛?遊?諛쒖넚 以?..`);
+      setButtonLoading(btn, true, '전체 ' + activeBots.length + '개 봇 발송 중...');
       
       let completed = 0;
       let successes = 0;
@@ -746,11 +747,11 @@
             else fails++;
             
             if (completed === activeBots.length) {
-              setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane mr-1"></i> ?쒖꽦 遊??꾩껜 ?뚯뒪??諛쒖넚');
+              setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane mr-1"></i> 활성 봇 전체 테스트 발송');
               if (fails === 0) {
-                showToast('success', '?꾩껜 ?뚯뒪???깃났', `?쒖꽦?붾맂 ${successes}媛?遊?紐⑤몢?먭쾶 ?뚯뒪??硫붿떆吏媛 諛쒖넚?섏뿀?듬땲??`);
+                showToast('success', '전체 테스트 성공', '활성화된 ' + successes + '개 봇 모두에게 테스트 메시지가 발송되었습니다.');
               } else {
-                showToast('warning', '?쇰? ?뚯뒪???꾨즺', `?깃났: ${successes}媛? ?ㅽ뙣: ${fails}媛?);
+                showToast('warning', '일부 테스트 완료', '성공: ' + successes + '개, 실패: ' + fails + '개');
               }
             }
           })
@@ -758,8 +759,8 @@
             completed++;
             fails++;
             if (completed === activeBots.length) {
-              setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane mr-1"></i> ?쒖꽦 遊??꾩껜 ?뚯뒪??諛쒖넚');
-              showToast('warning', '?뚯뒪???꾨즺', `?깃났: ${successes}媛? ?ㅽ뙣: ${fails}媛?);
+              setButtonLoading(btn, false, '<i class="fa-solid fa-paper-plane mr-1"></i> 활성 봇 전체 테스트 발송');
+              showToast('warning', '테스트 완료', '성공: ' + successes + '개, 실패: ' + fails + '개');
             }
           })
           .testTelegram(bot.token.trim(), bot.chatId.trim(), bot.name.trim());
@@ -774,7 +775,7 @@
       } else if (config.telegramToken || config.telegramChatId) {
         renderTelegramBots([{
           id: 'bot_1',
-          name: '湲곕낯 遊?,
+          name: '기본 봇',
           token: config.telegramToken || '',
           chatId: config.telegramChatId || '',
           enabled: true
@@ -782,7 +783,7 @@
       } else {
         renderTelegramBots([{
           id: 'bot_1',
-          name: '湲곕낯 遊?,
+          name: '기본 봇',
           token: '',
           chatId: '',
           enabled: true
@@ -808,7 +809,7 @@
       document.getElementById('showLinks').checked = !!config.showLinks;
       document.getElementById('includeAnalystSummary').checked = !!config.includeAnalystSummary;
       
-      showStatus('ready', '?뺤긽 ?곌껐??);
+      showStatus('ready', '정상 연결됨');
     }
 
     function collectFormConfig() {
@@ -842,19 +843,19 @@
       const config = collectFormConfig();
       const btn = document.getElementById('btnSave');
       
-      setButtonLoading(btn, true, '???以?..');
+      setButtonLoading(btn, true, '저장 중...');
       
       google.script.run
         .withSuccessHandler((res) => {
-          setButtonLoading(btn, false, '<i class="fa-solid fa-floppy-disk text-sky-400 mr-1"></i> ?뮶 ?ㅼ젙 ???(?⑤룆)');
+          setButtonLoading(btn, false, '<i class="fa-solid fa-floppy-disk text-sky-400 mr-1"></i> 💾 설정 저장 (단독)');
           if (res.success) {
-            showToast('success', '?ㅼ젙 ????꾨즺', res.message);
+            showToast('success', '설정 저장 완료', res.message);
           } else {
-            showToast('error', '????ㅻ쪟', res.message);
+            showToast('error', '저장 오류', res.message);
           }
         })
         .withFailureHandler((err) => {
-          setButtonLoading(btn, false, '<i class="fa-solid fa-floppy-disk text-sky-400 mr-1"></i> ?뮶 ?ㅼ젙 ???(?⑤룆)');
+          setButtonLoading(btn, false, '<i class="fa-solid fa-floppy-disk text-sky-400 mr-1"></i> 💾 설정 저장 (단독)');
           onApiError(err);
         })
         .saveSettings(config);
@@ -862,22 +863,22 @@
 
     function handleSyncTriggers() {
       const btn = document.getElementById('btnSyncTriggers');
-      setButtonLoading(btn, true, '?몃━嫄??숆린??以?..');
+      setButtonLoading(btn, true, '트리거 동기화 중...');
       
       const config = collectFormConfig();
       google.script.run
         .withSuccessHandler(() => {
           google.script.run
             .withSuccessHandler((res) => {
-              setButtonLoading(btn, false, '<i class="fa-solid fa-clock mr-1"></i> ???ㅼ?以??몃━嫄??숆린??);
+              setButtonLoading(btn, false, '<i class="fa-solid fa-clock mr-1"></i> ⏰ 스케줄 트리거 동기화');
               if (res.success) {
-                showToast('success', '?ㅼ?以??숆린???꾨즺', res.message);
+                showToast('success', '스케줄 동기화 완료', res.message);
               } else {
-                showToast('error', '?숆린???ㅻ쪟', res.message);
+                showToast('error', '동기화 오류', res.message);
               }
             })
             .withFailureHandler((err) => {
-              setButtonLoading(btn, false, '<i class="fa-solid fa-clock mr-1"></i> ???ㅼ?以??몃━嫄??숆린??);
+              setButtonLoading(btn, false, '<i class="fa-solid fa-clock mr-1"></i> ⏰ 스케줄 트리거 동기화');
               onApiError(err);
             })
             .syncTriggersAction();
@@ -889,7 +890,7 @@
       const btn = document.getElementById(btnId);
       const originalHtml = btn.innerHTML;
       
-      setButtonLoading(btn, true, '?곗씠??議고쉶 以?..');
+      setButtonLoading(btn, true, '데이터 조회 중...');
       
       const config = collectFormConfig();
       google.script.run
@@ -901,7 +902,7 @@
                 currentPreviewMarketType = marketType;
                 openPreviewModal(res);
               } else {
-                showToast('error', '誘몃━蹂닿린 ?ㅽ뙣', res.message);
+                showToast('error', '미리보기 실패', res.message);
               }
             })
             .withFailureHandler((err) => {
@@ -915,8 +916,8 @@
 
     function openPreviewModal(res) {
       document.getElementById('modalTitle').innerText = res.sessionTitle;
-      document.getElementById('modalSubtitle').innerText = `?곸쐞 ${res.stockCount}媛?醫낅ぉ ?ㅼ떆媛??섏쭛 寃곌낵`;
-      document.getElementById('modalCharBadge').innerText = `${res.charCount.toLocaleString()}??;
+      document.getElementById('modalSubtitle').innerText = '상위 ' + res.stockCount + '개 종목 실시간 수집 결과';
+      document.getElementById('modalCharBadge').innerText = res.charCount.toLocaleString() + '자';
       
       document.getElementById('previewRenderView').innerHTML = res.htmlMessage;
       document.getElementById('previewRawView').value = res.htmlMessage;
@@ -951,9 +952,9 @@
     function copyPreviewText() {
       const text = document.getElementById('previewRawView').value;
       navigator.clipboard.writeText(text).then(() => {
-        showToast('success', '蹂듭궗 ?꾨즺', '誘몃━蹂닿린 ?붾젅洹몃옩 HTML 硫붿떆吏媛 ?대┰蹂대뱶??蹂듭궗?섏뿀?듬땲??');
+        showToast('success', '복사 완료', '미리보기 텔레그램 HTML 메시지가 클립보드에 복사되었습니다.');
       }).catch(err => {
-        showToast('error', '蹂듭궗 ?ㅽ뙣', err.toString());
+        showToast('error', '복사 실패', err.toString());
       });
     }
 
@@ -961,13 +962,13 @@
       if (!currentPreviewMarketType) return;
       
       let fnName = 'sendManualKrxMainReport';
-      let label = '援?궡 ?뺢퇋??;
+      let label = '국내 정규장';
       if (currentPreviewMarketType === 'krxNxt') {
         fnName = 'sendManualKrxNxtReport';
-        label = '援?궡 NXT??;
+        label = '국내 NXT장';
       } else if (currentPreviewMarketType === 'usMain') {
         fnName = 'sendManualUsReport';
-        label = '誘멸뎅 留덇컧??;
+        label = '미국 마감장';
       }
       
       closePreviewModal();
@@ -978,15 +979,15 @@
       const btn = document.getElementById(btnId);
       const originalHtml = btn ? btn.innerHTML : '';
       
-      if (btn) setButtonLoading(btn, true, `${label} 諛쒖넚 以?..`);
+      if (btn) setButtonLoading(btn, true, label + ' 발송 중...');
       
       google.script.run
         .withSuccessHandler((res) => {
           if (btn) setButtonLoading(btn, false, originalHtml);
           if (res.success) {
-            showToast('success', `${label} 諛쒖넚 ?깃났`, res.message);
+            showToast('success', label + ' 발송 성공', res.message);
           } else {
-            showToast('error', `${label} 諛쒖넚 ?ㅽ뙣`, res.message);
+            showToast('error', label + ' 발송 실패', res.message);
           }
         })
         .withFailureHandler((err) => {
@@ -998,9 +999,9 @@
     function showStatus(type, text) {
       const el = document.getElementById('connectionStatus');
       if (type === 'loading') {
-        el.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span><span>${text}</span>`;
+        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span><span>' + text + '</span>';
       } else if (type === 'ready') {
-        el.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-emerald-300 font-medium">${text}</span>`;
+        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-emerald-300 font-medium">' + text + '</span>';
       }
     }
 
@@ -1009,7 +1010,7 @@
       if (isLoading) {
         btn.disabled = true;
         btn.classList.add('opacity-75', 'cursor-not-allowed');
-        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> ${textOrHtml}`;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> ' + textOrHtml;
       } else {
         btn.disabled = false;
         btn.classList.remove('opacity-75', 'cursor-not-allowed');
@@ -1035,17 +1036,16 @@
         icon = 'fa-triangle-exclamation text-amber-400';
       }
 
-      toast.className = `pointer-events-auto p-4 rounded-xl bg-slate-900/95 border ${borderCol} shadow-2xl text-slate-100 transition-all transform translate-y-2 opacity-0 flex items-start gap-3`;
-      toast.innerHTML = `
-        <i class="fa-solid ${icon} text-lg mt-0.5"></i>
-        <div class="flex-1 text-xs">
-          <p class="font-bold text-sm text-white mb-0.5">${escapeHtml(title)}</p>
-          <p class="text-slate-300 leading-relaxed">${escapeHtml(message).replace(/\n/g, '<br>')}</p>
-        </div>
-        <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      `;
+      toast.className = 'pointer-events-auto p-4 rounded-xl bg-slate-900/95 border ' + borderCol + ' shadow-2xl text-slate-100 transition-all transform translate-y-2 opacity-0 flex items-start gap-3';
+      toast.innerHTML = 
+        '<i class="fa-solid ' + icon + ' text-lg mt-0.5"></i>' +
+        '<div class="flex-1 text-xs">' +
+          '<p class="font-bold text-sm text-white mb-0.5">' + escapeHtml(title) + '</p>' +
+          '<p class="text-slate-300 leading-relaxed">' + escapeHtml(message).replace(/\n/g, '<br>') + '</p>' +
+        '</div>' +
+        '<button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white cursor-pointer">' +
+          '<i class="fa-solid fa-xmark"></i>' +
+        '</button>';
 
       container.appendChild(toast);
       
@@ -1075,7 +1075,7 @@
     }
 
     function onApiError(err) {
-      showToast('error', '?쒕쾭 ?듭떊 ?ㅻ쪟', err.message || err.toString());
+      showToast('error', '서버 통신 오류', err.message || err.toString());
     }
 
     function escapeHtml(str) {
