@@ -490,48 +490,49 @@
 
     function onMarketStatusLoaded(status) {
       if (!status) return;
-      document.getElementById('marketTodayDate').innerText = (status.today || '') + ' KST 기준';
+      const todayDateEl = document.getElementById('marketTodayDate');
+      if (todayDateEl) {
+        todayDateEl.innerText = (status.today || status.nowKst || '') + ' KST 기준';
+      }
       
-      const krxMainText = document.getElementById('krxMainText');
-      const krxMainBadge = document.getElementById('krxMainBadge');
-      if (status.krxMain && status.krxMain.isOpen) {
-        krxMainBadge.className = 'p-2 rounded-lg bg-emerald-500/10 text-emerald-400';
-        krxMainBadge.innerHTML = '<i class="fa-solid fa-door-open"></i>';
-        krxMainText.className = 'text-sm font-bold text-emerald-400';
-        krxMainText.innerText = '정규 개장 (' + status.krxMain.dayOfWeek + '요일)';
-      } else {
-        krxMainBadge.className = 'p-2 rounded-lg bg-amber-500/10 text-amber-400';
-        krxMainBadge.innerHTML = '<i class="fa-solid fa-door-closed"></i>';
-        krxMainText.className = 'text-sm font-bold text-amber-400';
-        krxMainText.innerText = '휴장 (' + (status.krxMain ? status.krxMain.reason : '휴장일') + ')';
-      }
+      updateMarketBadge('krxMainText', 'krxMainBadge', status.krxMain, 'krx');
+      updateMarketBadge('krxNxtText', 'krxNxtBadge', status.krxNxt, 'nxt');
+      updateMarketBadge('usMainText', 'usMainBadge', status.us, 'us');
+    }
 
-      const krxNxtText = document.getElementById('krxNxtText');
-      const krxNxtBadge = document.getElementById('krxNxtBadge');
-      if (status.krxNxt && status.krxNxt.isOpen) {
-        krxNxtBadge.className = 'p-2 rounded-lg bg-purple-500/10 text-purple-400';
-        krxNxtBadge.innerHTML = '<i class="fa-solid fa-door-open"></i>';
-        krxNxtText.className = 'text-sm font-bold text-purple-400';
-        krxNxtText.innerText = '야간 거래 (' + status.krxNxt.dayOfWeek + '요일)';
-      } else {
-        krxNxtBadge.className = 'p-2 rounded-lg bg-amber-500/10 text-amber-400';
-        krxNxtBadge.innerHTML = '<i class="fa-solid fa-door-closed"></i>';
-        krxNxtText.className = 'text-sm font-bold text-amber-400';
-        krxNxtText.innerText = '휴장 (' + (status.krxNxt ? status.krxNxt.reason : '휴장일') + ')';
-      }
+    function updateMarketBadge(textId, badgeId, marketInfo, type) {
+      const textEl = document.getElementById(textId);
+      const badgeEl = document.getElementById(badgeId);
+      if (!textEl || !badgeEl || !marketInfo) return;
 
-      const usMainText = document.getElementById('usMainText');
-      const usMainBadge = document.getElementById('usMainBadge');
-      if (status.us && status.us.isOpen) {
-        usMainBadge.className = 'p-2 rounded-lg bg-emerald-500/10 text-emerald-400';
-        usMainBadge.innerHTML = '<i class="fa-solid fa-door-open"></i>';
-        usMainText.className = 'text-sm font-bold text-emerald-400';
-        usMainText.innerText = '정규 개장 (' + status.us.dayOfWeek + '요일)';
+      const state = marketInfo.sessionState || (marketInfo.isOpen ? 'in_session' : 'closed');
+      const statusText = marketInfo.statusText || (marketInfo.isOpen ? `정규 개장 (${marketInfo.dayOfWeek}요일)` : `휴장 (${marketInfo.reason || '휴장일'})`);
+
+      textEl.innerText = statusText;
+
+      if (state === 'in_session') {
+        if (type === 'nxt') {
+          badgeEl.className = 'p-2 rounded-lg bg-purple-500/15 text-purple-400 border border-purple-500/30';
+          badgeEl.innerHTML = '<i class="fa-solid fa-moon animate-pulse"></i>';
+          textEl.className = 'text-sm font-bold text-purple-400 mt-0.5';
+        } else {
+          badgeEl.className = 'p-2 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+          badgeEl.innerHTML = '<i class="fa-solid fa-bolt animate-pulse"></i>';
+          textEl.className = 'text-sm font-bold text-emerald-400 mt-0.5';
+        }
+      } else if (state === 'before_market') {
+        badgeEl.className = 'p-2 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30';
+        badgeEl.innerHTML = '<i class="fa-regular fa-clock"></i>';
+        textEl.className = 'text-sm font-bold text-sky-400 mt-0.5';
+      } else if (state === 'market_closed') {
+        badgeEl.className = 'p-2 rounded-lg bg-slate-800 text-slate-400 border border-slate-700/60';
+        badgeEl.innerHTML = '<i class="fa-solid fa-flag-checkered"></i>';
+        textEl.className = 'text-sm font-bold text-slate-300 mt-0.5';
       } else {
-        usMainBadge.className = 'p-2 rounded-lg bg-amber-500/10 text-amber-400';
-        usMainBadge.innerHTML = '<i class="fa-solid fa-door-closed"></i>';
-        usMainText.className = 'text-sm font-bold text-amber-400';
-        usMainText.innerText = '휴장 (' + (status.us ? status.us.reason : '휴장일') + ')';
+        // holiday / closed
+        badgeEl.className = 'p-2 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30';
+        badgeEl.innerHTML = '<i class="fa-solid fa-door-closed"></i>';
+        textEl.className = 'text-sm font-bold text-amber-400 mt-0.5';
       }
     }
 

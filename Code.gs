@@ -823,30 +823,135 @@ function isUsHoliday(targetDate) {
 }
 
 /**
- * 대시보드 UI를 위한 현재 한국/미국 증시 장운영 상태 조회 API
+ * 대시보드 UI를 위한 현재 한국/미국 증시 실시간 장운영 상태 및 세션(개장중/개장대기/마감/휴장) 조회 API
  */
 function getMarketStatus() {
   const now = new Date();
   const krxCheck = isKrxHoliday(now);
   const usCheck = isUsHoliday(now);
-  
+  const dstActive = isUsDst(now);
+
+  const formattedDate = Utilities.formatDate(now, 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
+  const kstHour = parseInt(Utilities.formatDate(now, 'Asia/Seoul', 'H'), 10);
+  const kstMin = parseInt(Utilities.formatDate(now, 'Asia/Seoul', 'm'), 10);
+  const kstTimeVal = kstHour * 60 + kstMin; // 0 ~ 1439 분
+
+  // 1. 국내 정규장 (KRX Main: 09:00 ~ 15:30)
+  let krxMainSession = {
+    isOpen: !krxCheck.isHoliday,
+    isHoliday: krxCheck.isHoliday,
+    reason: krxCheck.reason,
+    dateStr: krxCheck.dateStr,
+    dayOfWeek: krxCheck.dayOfWeek,
+    sessionState: 'closed',
+    statusText: '',
+    badgeClass: 'amber'
+  };
+
+  if (krxCheck.isHoliday) {
+    krxMainSession.sessionState = 'holiday';
+    krxMainSession.statusText = `휴장 (${krxCheck.reason})`;
+    krxMainSession.badgeClass = 'amber';
+  } else {
+    if (kstTimeVal < 9 * 60) {
+      // 09:00 개장 전
+      krxMainSession.sessionState = 'before_market';
+      krxMainSession.statusText = `개장 대기 (09:00 개장)`;
+      krxMainSession.badgeClass = 'sky';
+    } else if (kstTimeVal >= 9 * 60 && kstTimeVal < 15 * 60 + 30) {
+      // 09:00 ~ 15:30 정규장 거래 중
+      krxMainSession.sessionState = 'in_session';
+      krxMainSession.statusText = `정규 개장 중 (09:00~15:30)`;
+      krxMainSession.badgeClass = 'emerald';
+    } else {
+      // 15:30 이후 정규장 마감
+      krxMainSession.sessionState = 'market_closed';
+      krxMainSession.statusText = `오늘 장 마감 (15:30 종료)`;
+      krxMainSession.badgeClass = 'slate';
+    }
+  }
+
+  // 2. 국내 야간 대체거래소 (KRX NXT: 15:30 ~ 20:00)
+  let krxNxtSession = {
+    isOpen: !krxCheck.isHoliday,
+    isHoliday: krxCheck.isHoliday,
+    reason: krxCheck.reason,
+    dateStr: krxCheck.dateStr,
+    dayOfWeek: krxCheck.dayOfWeek,
+    sessionState: 'closed',
+    statusText: '',
+    badgeClass: 'amber'
+  };
+
+  if (krxCheck.isHoliday) {
+    krxNxtSession.sessionState = 'holiday';
+    krxNxtSession.statusText = `휴장 (${krxCheck.reason})`;
+    krxNxtSession.badgeClass = 'amber';
+  } else {
+    if (kstTimeVal < 15 * 60 + 30) {
+      krxNxtSession.sessionState = 'before_market';
+      krxNxtSession.statusText = `야간 대기 (15:30 개장)`;
+      krxNxtSession.badgeClass = 'sky';
+    } else if (kstTimeVal >= 15 * 60 + 30 && kstTimeVal < 20 * 60) {
+      krxNxtSession.sessionState = 'in_session';
+      krxNxtSession.statusText = `야간 거래 중 (15:30~20:00)`;
+      krxNxtSession.badgeClass = 'purple';
+    } else {
+      krxNxtSession.sessionState = 'market_closed';
+      krxNxtSession.statusText = `야간 거래 마감 (20:00 종료)`;
+      krxNxtSession.badgeClass = 'slate';
+    }
+  }
+
+  // 3. 미국 정규 증시 (US Main: DST 22:30~05:00, 비DST 23:30~06:00 KST)
+  const usOpenTimeStr = dstActive ? '22:30' : '23:30';
+  const usCloseTimeStr = dstActive ? '05:00' : '06:00';
+  const usOpenTimeVal = dstActive ? (22 * 60 + 30) : (23 * 60 + 30);
+  const usCloseTimeVal = dstActive ? (5 * 60) : (6 * 60);
+
+  let usSession = {
+    isOpen: !usCheck.isHoliday,
+    isHoliday: usCheck.isHoliday,
+    reason: usCheck.reason,
+    marketDateStr: usCheck.marketDateStr,
+    dayOfWeek: usCheck.dayOfWeek,
+    dstActive: dstActive,
+    sessionState: 'closed',
+    statusText: '',
+    badgeClass: 'amber'
+  };
+
+  if (usCheck.isHoliday) {
+    usSession.sessionState = 'holiday';
+    usSession.statusText = `휴장 (${usCheck.reason})`;
+    usSession.badgeClass = 'amber';
+  } else {
+    if (kstTimeVal < usCloseTimeVal) {
+      // 00:00 ~ 05:00/06:00 (새벽 정규 개장 중)
+      usSession.sessionState = 'in_session';
+      usSession.statusText = `정규 개장 중 (${usOpenTimeStr}~${usCloseTimeStr})`;
+      usSession.badgeClass = 'emerald';
+    } else if (kstTimeVal >= usCloseTimeVal && kstTimeVal < usOpenTimeVal) {
+      // 05:00/06:00 ~ 22:30/23:30 (낮 시간대 개장 대기 중)
+      usSession.sessionState = 'before_market';
+      usSession.statusText = `개장 대기 (오늘 밤 ${usOpenTimeStr} 개장)`;
+      usSession.badgeClass = 'sky';
+    } else {
+      // 22:30/23:30 ~ 24:00 (밤 개장 후 실시간 거래 중)
+      usSession.sessionState = 'in_session';
+      usSession.statusText = `정규 개장 중 (${usOpenTimeStr}~${usCloseTimeStr})`;
+      usSession.badgeClass = 'emerald';
+    }
+  }
+
   return {
     success: true,
-    nowKst: formatDate(now),
-    krx: {
-      dateStr: krxCheck.dateStr,
-      dayOfWeek: krxCheck.dayOfWeek,
-      isHoliday: krxCheck.isHoliday,
-      reason: krxCheck.reason,
-      isOpen: !krxCheck.isHoliday
-    },
-    us: {
-      marketDateStr: usCheck.marketDateStr,
-      dayOfWeek: usCheck.dayOfWeek,
-      isHoliday: usCheck.isHoliday,
-      reason: usCheck.reason,
-      isOpen: !usCheck.isHoliday
-    }
+    today: formattedDate,
+    nowKst: formattedDate,
+    krxMain: krxMainSession,
+    krxNxt: krxNxtSession,
+    us: usSession,
+    krx: krxMainSession // 하위 호환
   };
 }
 
