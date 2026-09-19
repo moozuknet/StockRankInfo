@@ -317,9 +317,11 @@ function getDefaultConfig() {
     ],
     telegramToken: '',
     telegramChatId: '',
-    krxMain: true,
-    krxNxt: false,
-    usMain: true,
+    krxPre: true,     // 08:55 NXT 장전 프리마켓 마감 알림
+    krxMain: true,    // 15:35 KRX/NXT 정규 메인마켓 마감 알림
+    krxAfter: true,   // 20:05 KRX/NXT 야간 통합 애프터마켓 마감 알림
+    krxNxt: true,     // 레거시 호환 필드
+    usMain: true,     // 05:05/06:05 미국 증시 마감 알림
     skipHolidays: true,
     topN: 20,
     compare1d: true,
@@ -344,6 +346,17 @@ function loadSettings() {
     }
     const saved = JSON.parse(jsonStr);
     const config = Object.assign(getDefaultConfig(), saved);
+    
+    // krxPre 기본값 보장 (신규 추가 필드 마이그레이션)
+    if (config.krxPre === undefined) {
+      config.krxPre = true;
+    }
+    // krxAfter / krxNxt 상호 호환 동기화
+    if (config.krxAfter === undefined && config.krxNxt !== undefined) {
+      config.krxAfter = config.krxNxt;
+    } else if (config.krxAfter !== undefined && config.krxNxt === undefined) {
+      config.krxNxt = config.krxAfter;
+    }
     
     // 마이그레이션 및 정규화
     if (!Array.isArray(config.telegramBots) || config.telegramBots.length === 0) {
@@ -387,6 +400,11 @@ function saveSettings(config) {
     }
     
     config.topN = parseInt(config.topN, 10) || 20;
+    config.krxPre = config.krxPre !== false;
+    config.krxMain = config.krxMain !== false;
+    config.krxAfter = config.krxAfter !== false;
+    config.krxNxt = config.krxAfter; // 하위 호환 동기화
+    config.usMain = config.usMain !== false;
     
     // telegramBots 유효성 검사 및 정규화
     if (Array.isArray(config.telegramBots)) {
@@ -477,11 +495,14 @@ function previewReport(marketType) {
     let data = [];
     let sessionTitle = '';
     
-    if (marketType === 'krxMain') {
+    if (marketType === 'krxPre') {
+      sessionTitle = '[🌅 국내 장전 프리마켓 마감 시총 분석]';
+      data = fetchKrxMarketData(config.topN);
+    } else if (marketType === 'krxMain') {
       sessionTitle = '[📊 국내 정규장 마감 시총 분석]';
       data = fetchKrxMarketData(config.topN);
-    } else if (marketType === 'krxNxt') {
-      sessionTitle = '[🌙 국내 NXT 야간장 마감 시총 분석]';
+    } else if (marketType === 'krxAfter' || marketType === 'krxNxt') {
+      sessionTitle = '[🌙 국내 통합 애프터마켓 마감 시총 분석]';
       data = fetchKrxMarketData(config.topN);
     } else if (marketType === 'usMain') {
       sessionTitle = '[🇺🇸 미국 증시 마감 시총 분석]';
@@ -836,7 +857,39 @@ function getMarketStatus() {
   const kstMin = parseInt(Utilities.formatDate(now, 'Asia/Seoul', 'm'), 10);
   const kstTimeVal = kstHour * 60 + kstMin; // 0 ~ 1439 분
 
-  // 1. 국내 정규장 (KRX Main: 09:00 ~ 15:30)
+  // 1. 국내 장전 프리마켓 (NXT Pre-market: 08:00 ~ 08:50)
+  let krxPreSession = {
+    isOpen: !krxCheck.isHoliday,
+    isHoliday: krxCheck.isHoliday,
+    reason: krxCheck.reason,
+    dateStr: krxCheck.dateStr,
+    dayOfWeek: krxCheck.dayOfWeek,
+    sessionState: 'closed',
+    statusText: '',
+    badgeClass: 'amber'
+  };
+
+  if (krxCheck.isHoliday) {
+    krxPreSession.sessionState = 'holiday';
+    krxPreSession.statusText = `휴장 (${krxCheck.reason})`;
+    krxPreSession.badgeClass = 'amber';
+  } else {
+    if (kstTimeVal < 8 * 60) {
+      krxPreSession.sessionState = 'before_market';
+      krxPreSession.statusText = `프리마켓 대기 (08:00 개장)`;
+      krxPreSession.badgeClass = 'sky';
+    } else if (kstTimeVal >= 8 * 60 && kstTimeVal < 8 * 60 + 50) {
+      krxPreSession.sessionState = 'in_session';
+      krxPreSession.statusText = `프리마켓 거래 중 (08:00~08:50)`;
+      krxPreSession.badgeClass = 'amber';
+    } else {
+      krxPreSession.sessionState = 'market_closed';
+      krxPreSession.statusText = `프리마켓 마감 (08:50 종료)`;
+      krxPreSession.badgeClass = 'slate';
+    }
+  }
+
+  // 2. 국내 정규장 메인마켓 (KRX: 09:00~15:30 / NXT: 09:00:30~15:20)
   let krxMainSession = {
     isOpen: !krxCheck.isHoliday,
     isHoliday: krxCheck.isHoliday,
@@ -866,13 +919,13 @@ function getMarketStatus() {
     } else {
       // 15:30 이후 정규장 마감
       krxMainSession.sessionState = 'market_closed';
-      krxMainSession.statusText = `오늘 장 마감 (15:30 종료)`;
+      krxMainSession.statusText = `오늘 정규장 마감 (15:30 종료)`;
       krxMainSession.badgeClass = 'slate';
     }
   }
 
-  // 2. 국내 야간 대체거래소 (KRX NXT: 15:30 ~ 20:00)
-  let krxNxtSession = {
+  // 3. 국내 통합 애프터마켓 (NXT: 15:40~20:00 / KRX: 16:00~20:00 실시간 접속매매)
+  let krxAfterSession = {
     isOpen: !krxCheck.isHoliday,
     isHoliday: krxCheck.isHoliday,
     reason: krxCheck.reason,
@@ -884,26 +937,26 @@ function getMarketStatus() {
   };
 
   if (krxCheck.isHoliday) {
-    krxNxtSession.sessionState = 'holiday';
-    krxNxtSession.statusText = `휴장 (${krxCheck.reason})`;
-    krxNxtSession.badgeClass = 'amber';
+    krxAfterSession.sessionState = 'holiday';
+    krxAfterSession.statusText = `휴장 (${krxCheck.reason})`;
+    krxAfterSession.badgeClass = 'amber';
   } else {
-    if (kstTimeVal < 15 * 60 + 30) {
-      krxNxtSession.sessionState = 'before_market';
-      krxNxtSession.statusText = `야간 대기 (15:30 개장)`;
-      krxNxtSession.badgeClass = 'sky';
-    } else if (kstTimeVal >= 15 * 60 + 30 && kstTimeVal < 20 * 60) {
-      krxNxtSession.sessionState = 'in_session';
-      krxNxtSession.statusText = `야간 거래 중 (15:30~20:00)`;
-      krxNxtSession.badgeClass = 'purple';
+    if (kstTimeVal < 15 * 60 + 40) {
+      krxAfterSession.sessionState = 'before_market';
+      krxAfterSession.statusText = `애프터마켓 대기 (15:40 개장)`;
+      krxAfterSession.badgeClass = 'sky';
+    } else if (kstTimeVal >= 15 * 60 + 40 && kstTimeVal < 20 * 60) {
+      krxAfterSession.sessionState = 'in_session';
+      krxAfterSession.statusText = `애프터마켓 거래 중 (15:40~20:00)`;
+      krxAfterSession.badgeClass = 'purple';
     } else {
-      krxNxtSession.sessionState = 'market_closed';
-      krxNxtSession.statusText = `야간 거래 마감 (20:00 종료)`;
-      krxNxtSession.badgeClass = 'slate';
+      krxAfterSession.sessionState = 'market_closed';
+      krxAfterSession.statusText = `애프터마켓 마감 (20:00 종료)`;
+      krxAfterSession.badgeClass = 'slate';
     }
   }
 
-  // 3. 미국 정규 증시 (US Main: DST 22:30~05:00, 비DST 23:30~06:00 KST)
+  // 4. 미국 정규 증시 (US Main: DST 22:30~05:00, 비DST 23:30~06:00 KST)
   const usOpenTimeStr = dstActive ? '22:30' : '23:30';
   const usCloseTimeStr = dstActive ? '05:00' : '06:00';
   const usOpenTimeVal = dstActive ? (22 * 60 + 30) : (23 * 60 + 30);
@@ -948,8 +1001,10 @@ function getMarketStatus() {
     success: true,
     today: formattedDate,
     nowKst: formattedDate,
+    krxPre: krxPreSession,
     krxMain: krxMainSession,
-    krxNxt: krxNxtSession,
+    krxAfter: krxAfterSession,
+    krxNxt: krxAfterSession, // 하위 호환
     us: usSession,
     krx: krxMainSession // 하위 호환
   };
@@ -978,7 +1033,9 @@ function isUsDst(date) {
 
 function syncTriggers(config) {
   const targetFunctions = [
+    'sendKrxPreReport',
     'sendKrxMainReport',
+    'sendKrxAfterReport',
     'sendKrxNxtReport',
     'sendUsReport',
     'dailyTriggerCheck'
@@ -999,6 +1056,30 @@ function syncTriggers(config) {
   
   const createdList = [];
   
+  // 1. 국내 프리마켓 (평일 08:55 KST)
+  if (config.krxPre) {
+    try {
+      ScriptApp.newTrigger('sendKrxPreReport')
+        .timeBased()
+        .onWeekDays()
+        .atHour(8)
+        .nearMinute(55)
+        .inTimezone('Asia/Seoul')
+        .create();
+      createdList.push('국내 프리마켓 (평일 08:55)');
+    } catch (err) {
+      ScriptApp.newTrigger('sendKrxPreReport')
+        .timeBased()
+        .everyDays(1)
+        .atHour(8)
+        .nearMinute(55)
+        .inTimezone('Asia/Seoul')
+        .create();
+      createdList.push('국내 프리마켓 (매일 08:55)');
+    }
+  }
+
+  // 2. 국내 정규장 메인마켓 (평일 15:35 KST)
   if (config.krxMain) {
     try {
       ScriptApp.newTrigger('sendKrxMainReport')
@@ -1021,28 +1102,30 @@ function syncTriggers(config) {
     }
   }
   
-  if (config.krxNxt) {
+  // 3. 국내 통합 애프터마켓 (평일 20:05 KST)
+  if (config.krxAfter || config.krxNxt) {
     try {
-      ScriptApp.newTrigger('sendKrxNxtReport')
+      ScriptApp.newTrigger('sendKrxAfterReport')
         .timeBased()
         .onWeekDays()
         .atHour(20)
         .nearMinute(5)
         .inTimezone('Asia/Seoul')
         .create();
-      createdList.push('국내 NXT장 (평일 20:05)');
+      createdList.push('국내 애프터마켓 (평일 20:05)');
     } catch (err) {
-      ScriptApp.newTrigger('sendKrxNxtReport')
+      ScriptApp.newTrigger('sendKrxAfterReport')
         .timeBased()
         .everyDays(1)
         .atHour(20)
         .nearMinute(5)
         .inTimezone('Asia/Seoul')
         .create();
-      createdList.push('국내 NXT장 (매일 20:05)');
+      createdList.push('국내 애프터마켓 (매일 20:05)');
     }
   }
   
+  // 4. 미국 증시 마감 (화~토 05:05/06:05 KST)
   if (config.usMain) {
     const dstActive = isUsDst(new Date());
     const targetHour = dstActive ? 5 : 6;
@@ -1514,9 +1597,12 @@ function generateAnalystSummary(stockList, sessionTitle, config) {
   if (sessionTitle.includes('미국')) {
     summaryText += `  • 엔비디아/빅테크 중심의 AI 모멘텀 주도 장세 형성\n`;
     summaryText += `  • 미 연준 금리 전망 및 실적 시즌 대형주 차별화 심화`;
-  } else if (sessionTitle.includes('NXT')) {
-    summaryText += `  • 야간 대체거래소(NXT) 마감 결과 선물/해외증시 온기 반영\n`;
-    summaryText += `  • 정규장 마감 후 공시 이슈 종목 중심 거래대금 집중`;
+  } else if (sessionTitle.includes('프리마켓') || sessionTitle.includes('장전')) {
+    summaryText += `  • 장전 프리마켓(NXT) 체결 결과 전일 미 증시 온기 및 개장 전 주요 호재성 공시 종목 위주 시총 변동 형성\n`;
+    summaryText += `  • 정규장(09:00) 시초가 형성을 앞두고 외인/기관 사전 호가 및 거래대금 유입 탐색`;
+  } else if (sessionTitle.includes('애프터마켓') || sessionTitle.includes('NXT')) {
+    summaryText += `  • 정규장 마감 후 KRX/NXT 통합 애프터마켓(16:00~20:00) 실시간 접속매매 반영 결과\n`;
+    summaryText += `  • 장후 기업 실적 발표 및 시간외 공시 모멘텀 기반 종목별 수급 차별화 지속`;
   } else {
     summaryText += `  • 반도체/금융주 주도의 시총 상위 대형주 외인/기관 순매수 유입\n`;
     summaryText += `  • 밸류업 프로그램 연계 저PBR 및 고배당주 중심 강세 연장`;
@@ -1642,6 +1728,25 @@ function splitHtmlMessage(text, maxLength) {
   return chunks;
 }
 
+function sendKrxPreReport() {
+  const config = loadSettings();
+  
+  // 휴장일 자동 발송 제외 체크
+  if (config.skipHolidays) {
+    const check = isKrxHoliday(new Date());
+    if (check.isHoliday) {
+      const skipLog = `[발송 제외] 오늘은 국내 증시 휴장일(${check.reason})이므로 장전 프리마켓 리포트 발송을 건너뜁니다.`;
+      Logger.log(skipLog);
+      return { success: true, skipped: true, message: skipLog };
+    }
+  }
+
+  const data = fetchKrxMarketData(config.topN);
+  const processed = calculateHistoricalChanges(data, config);
+  const html = generateReportHtml('[🌅 국내 장전 프리마켓 마감 시총 분석]', processed, config);
+  return sendTelegramMessage(config, html);
+}
+
 function sendKrxMainReport() {
   const config = loadSettings();
   
@@ -1661,14 +1766,14 @@ function sendKrxMainReport() {
   return sendTelegramMessage(config, html);
 }
 
-function sendKrxNxtReport() {
+function sendKrxAfterReport() {
   const config = loadSettings();
   
   // 휴장일 자동 발송 제외 체크
   if (config.skipHolidays) {
     const check = isKrxHoliday(new Date());
     if (check.isHoliday) {
-      const skipLog = `[발송 제외] 오늘은 국내 증시 휴장일(${check.reason})이므로 NXT 야간장 마감 리포트 발송을 건너뜁니다.`;
+      const skipLog = `[발송 제외] 오늘은 국내 증시 휴장일(${check.reason})이므로 애프터마켓 마감 리포트 발송을 건너뜁니다.`;
       Logger.log(skipLog);
       return { success: true, skipped: true, message: skipLog };
     }
@@ -1676,8 +1781,13 @@ function sendKrxNxtReport() {
 
   const data = fetchKrxMarketData(config.topN);
   const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[🌙 국내 NXT 야간장 마감 시총 분석]', processed, config);
+  const html = generateReportHtml('[🌙 국내 통합 애프터마켓 마감 시총 분석]', processed, config);
   return sendTelegramMessage(config, html);
+}
+
+// 레거시 호환성 유지
+function sendKrxNxtReport() {
+  return sendKrxAfterReport();
 }
 
 function sendUsReport() {
@@ -1700,6 +1810,14 @@ function sendUsReport() {
 }
 
 // 수동 즉시 발송 함수 (대시보드 UI 테스트용 - 휴장일이라도 강제 전송)
+function sendManualKrxPreReport() {
+  const config = loadSettings();
+  const data = fetchKrxMarketData(config.topN);
+  const processed = calculateHistoricalChanges(data, config);
+  const html = generateReportHtml('[🌅 국내 장전 프리마켓 마감 시총 분석]', processed, config);
+  return sendTelegramMessage(config, html);
+}
+
 function sendManualKrxMainReport() {
   const config = loadSettings();
   const data = fetchKrxMarketData(config.topN);
@@ -1708,12 +1826,16 @@ function sendManualKrxMainReport() {
   return sendTelegramMessage(config, html);
 }
 
-function sendManualKrxNxtReport() {
+function sendManualKrxAfterReport() {
   const config = loadSettings();
   const data = fetchKrxMarketData(config.topN);
   const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[🌙 국내 NXT 야간장 마감 시총 분석]', processed, config);
+  const html = generateReportHtml('[🌙 국내 통합 애프터마켓 마감 시총 분석]', processed, config);
   return sendTelegramMessage(config, html);
+}
+
+function sendManualKrxNxtReport() {
+  return sendManualKrxAfterReport();
 }
 
 function sendManualUsReport() {

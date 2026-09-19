@@ -4,48 +4,94 @@
   <base target="_top">
   <title>README - 증시 시가총액 변동 분석 & 텔레그램 자동 발송</title>
   <style>
-    body { font-family: monospace, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; line-height: 1.6; }
-    pre { white-space: pre-wrap; word-wrap: break-word; background: #1e293b; padding: 16px; border-radius: 8px; border: 1px solid #334155; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; line-height: 1.6; max-width: 960px; margin: 0 auto; }
+    h1, h2, h3 { color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 6px; margin-top: 24px; }
+    pre { white-space: pre-wrap; word-wrap: break-word; background: #1e293b; padding: 16px; border-radius: 8px; border: 1px solid #334155; font-family: monospace; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    th, td { border: 1px solid #334155; padding: 10px 12px; text-align: left; }
+    th { background: #1e293b; color: #38bdf8; }
+    tr:nth-child(even) { background: #0f172a; }
+    tr:nth-child(odd) { background: #131d33; }
+    code { background: #1e293b; color: #f472b6; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-right: 6px; }
+    .badge-blue { background: #1d4ed8; color: #fff; }
+    .badge-green { background: #15803d; color: #fff; }
   </style>
 </head>
 <body>
-  <h1>📊 README - 증시 시가총액 변동 분석 & 텔레그램 자동 발송</h1>
-  <pre>
-# 📊 증시 시가총액 변동 분석 & 텔레그램 자동 발송 웹 UI (GAS Project)
+  <h1>📊 README - 증시 시가총액 변동 분석 &amp; 텔레그램 자동 발송 웹 UI</h1>
+  <div>
+    <span class="badge badge-blue">v2.3.0 Release</span>
+    <span class="badge badge-green">Google Apps Script</span>
+  </div>
+  <p><b>Google Apps Script(GAS)</b>와 <b>Modern TailwindCSS Web UI</b> 기반으로 개발된 한국 증시(NXT 프리마켓 / KRX·NXT 정규장 / 통합 애프터마켓) 및 미국 증시(US 본장) 시가총액 변동 자동 분석 및 텔레그램 리포팅 시스템입니다.</p>
 
-> **Google Apps Script(GAS)**와 **Modern TailwindCSS Web UI** 기반으로 개발된 한국 증시(KRX 정규장 / NXT 야간장) 및 미국 증시(US 본장) 시가총액 변동 자동 분석 및 텔레그램 리포팅 시스템입니다.
+  <h2>🌟 핵심 기능 요약</h2>
+  <ol>
+    <li><b>📱 Web UI 설정 대시보드 (`Index.html`)</b>
+      <ul>
+        <li><b>텔레그램 다중 Bot 연동 관리 (v2.1+):</b> 여러 개의 텔레그램 봇 등록 및 활성/비활성 제어.</li>
+        <li><b>2026.09.14 개편 시장별 4대 시간대별 발송 제어 (v2.3+):</b>
+          <ul>
+            <li>🌅 <b>국내 프리마켓 마감 (평일 08:55 KST):</b> NXT 장전 프리마켓(08:00~08:50) 마감 및 개장 준비 브리핑.</li>
+            <li>📊 <b>국내 정규장 마감 (평일 15:35 KST):</b> KRX &amp; NXT 정규 메인마켓(09:00~15:30) 종가 확정 후 마감 시총 분석.</li>
+            <li>🌙 <b>국내 통합 애프터마켓 마감 (평일 20:05 KST):</b> KRX(16:00~20:00) &amp; NXT(15:40~20:00) 실시간 접속매매 최종 마감 분석.</li>
+            <li>🇺🇸 <b>미국 본장 마감 (화~토 05:05/06:05 KST):</b> NYSE &amp; NASDAQ 본장 마감 및 서머타임 연동 분석.</li>
+          </ul>
+        </li>
+        <li><b>4대 세션 실시간 미리보기:</b> 프리마켓 / 정규장 / 애프터마켓 / 미국장 실시간 데이터 수집 및 텔레그램 모달 팝업 미리보기.</li>
+        <li><b>실시간 장운영 상태 안내 위젯:</b> 4대 시장의 실시간 개장/대기/마감 상태 대시보드 표시.</li>
+      </ul>
+    </li>
+    <li><b>⚙️ 백엔드 데이터 처리 &amp; 자동화 (`Code.gs`)</b>
+      <ul>
+        <li><b>2026.09.14 KRX/NXT 최신 운영시간 반영:</b> 시간외단일가 폐지 및 애프터마켓 실시간 접속매매 전환에 맞춘 정밀 스케줄링.</li>
+        <li><b>휴장일 판별 하이브리드 엔진:</b> 대한민국 공휴일, 근로자의 날, 연말 결산 휴장일 및 미국 증시 공휴일 자동 건너뛰기.</li>
+        <li><b>미국 서머타임(DST) 자동 처리:</b> EDT(05:05 KST) / EST(06:05 KST) 자동 전환.</li>
+      </ul>
+    </li>
+  </ol>
 
----
+  <h2>⏰ 최신 시장 운영 시간 및 발송 스케줄 비교</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>세션 구분</th>
+        <th>마켓 운영 시간</th>
+        <th>발송 시각 (KST)</th>
+        <th>설명</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>🌅 국내 장전 프리마켓</b></td>
+        <td>NXT: 08:00 ~ 08:50</td>
+        <td><b>평일 08:55</b></td>
+        <td>NXT 장전 접속매매 마감 직후 개장 준비 브리핑</td>
+      </tr>
+      <tr>
+        <td><b>📊 국내 정규 메인마켓</b></td>
+        <td>KRX: 09:00~15:30 / NXT: 09:00:30~15:20</td>
+        <td><b>평일 15:35</b></td>
+        <td>정규 거래 세션 종가 기준 시가총액 변동 분석</td>
+      </tr>
+      <tr>
+        <td><b>🌙 국내 통합 애프터마켓</b></td>
+        <td>KRX: 16:00~20:00 / NXT: 15:40~20:00</td>
+        <td><b>평일 20:05</b></td>
+        <td>양대 거래소 애프터마켓 실시간 접속매매 마감 분석</td>
+      </tr>
+      <tr>
+        <td><b>🇺🇸 미국 정규 증시</b></td>
+        <td>미 현지: 09:30 ~ 16:00</td>
+        <td><b>화~토 05:05 / 06:05</b></td>
+        <td>NYSE &amp; NASDAQ 마감 분석 (DST 자동 연동)</td>
+      </tr>
+    </tbody>
+  </table>
 
-## 🌟 핵심 기능 요약
-
-1. **📱 Web UI 설정 대시보드 (`Index.html`)**
-   - **텔레그램 다중 Bot 연동 관리 (v2.1+)**: 여러 개의 텔레그램 봇(별칭, Bot Token, Chat ID) 등록 및 활성/비활성 제어, 개별/전체 즉각적인 연동 테스트 지원.
-   - **세션별 발송 제어**: 국내 정규장 (15:40 마감), 국내 NXT 야간장 (20:10 마감), 미국 본장 마감(05:05/06:10 KST) 독립 다중 체크박스 선택.
-   - **기능 분리형 액션 바**:
-     - `[💾 설정 저장 (단독)]`: 스케줄 트리거를 건드리지 않고 UI 설정값만 영구 보관.
-     - `[⏰ 스케줄 트리거 동기화]`: 활성화된 세션에 맞춰 스케줄러 트리거 등록/해제 관리.
-   - **`[👁️ 리포트 미리보기]` 기능 (v1.2+)**: 텔레그램 발송 전 실제 수집 데이터 기준 발송 메시지 및 렌더링 미리보기(모달 팝업) 지원.
-   - **알림 수신 항목 커스터마이징**:
-     - 조회 범위: 시가총액 상위 10위 / 20위 / 30위 / 40위 선택.
-     - 과거 비교 시점: **1일 전 / 5일 전 / 1개월 전 / 3개월 전 / 1년 전** 다중 선택.
-     - 과거 시가총액 금액 표기 (`config.showPastCap`): 비교 시점의 시총 금액(조/억원 또는 $B) 동적 포함.
-     - 표시 옵션: 등락률(%), 강조 아이콘(🚀 급등, 🔥 상승, 🚨 급락), 종목 상세 HTML 링크(네이버 증권 / 구글 파이낸스).
-     - **순위 변동 기준 급등/급락 분석 (v1.6+)**: 수익률(%)이 아닌 순위 변동폭(rankShift = pastRank - currentRank) 기준의 순위 급등(▲계단) 및 급락(▼계단) 요약.
-     - **KRX 40개 종목 팩트 데이터베이스 탑재 (v1.7+)**: 1일 전, 5일 전, 1개월 전, 3개월 전, 1년 전 과거 순위 및 등락률 팩트 데이터 매핑.
-
-2. **⚙️ 백엔드 데이터 처리 & 자동화 (`Code.gs`)**
-   - **네이버 증권 Mobile API 정밀 파싱**: `closePriceRaw`(현재가), `fluctuationsRatio`(등락률%), `marketValueHangeul`(한글 시총) 적용으로 0원 및 급등치 오류 보정.
-   - **시총 1위 고정 종목 검증**: 삼성전자, Apple, NVIDIA 등 시총 1위 독점 대형주의 과거 순위 왜곡(상승표기) 방지.
-   - **자동 스케줄러 동기화 (`syncTriggersAction`)**: `ClockTriggerBuilder.onWeekDays()` 지원 및 예외 시 fallback 처리.
-   - **미국 서머타임(DST) 자동 처리**: 3월 2번째 일요일 ~ 11월 1번째 일요일 구간을 판별하여 05:05 KST(EDT 적용 시) 또는 06:05 KST(EST 적용 시) 자동 전환.
-   - **텔레그램 HTML 포맷팅 & 메시지 분할 (`splitHtmlMessage`)**: 텔레그램 단일 메시지 4,096자 제한 초과 시 태그 손상 없이 안전하게 1/N 분할 발송.
-
----
-
-## 🔗 프로젝트 저장소 및 안내
-
-- **GitHub 저장소**: https://github.com/moozuknet/StockRankInfo
-  </pre>
+  <h2>🔗 프로젝트 저장소 및 안내</h2>
+  <p><b>GitHub 저장소:</b> <a href="https://github.com/moozuknet/StockRankInfo" style="color: #38bdf8;">https://github.com/moozuknet/StockRankInfo</a></p>
+  <p><b>개발 및 기술 가이드:</b> <a href="DEVELOPMENT_GUIDE.html" style="color: #38bdf8;">DEVELOPMENT_GUIDE.html</a> 참고</p>
 </body>
 </html>

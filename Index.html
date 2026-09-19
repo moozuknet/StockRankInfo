@@ -118,11 +118,22 @@
         </div>
         <span id="marketTodayDate" class="text-xs font-mono text-slate-400">조회 중...</span>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- KRX Regular -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <!-- NXT Pre-market -->
         <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
           <div>
-            <div class="text-xs text-slate-400">국내 정규장 (KRX)</div>
+            <div class="text-xs text-slate-400">국내 장전 프리마켓 (NXT)</div>
+            <div id="krxPreText" class="text-sm font-bold text-slate-200 mt-0.5">확인 중...</div>
+          </div>
+          <div id="krxPreBadge" class="p-2 rounded-lg bg-slate-800 text-slate-400">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+          </div>
+        </div>
+
+        <!-- KRX Regular Main -->
+        <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="text-xs text-slate-400">국내 정규장 (KRX/NXT)</div>
             <div id="krxMainText" class="text-sm font-bold text-slate-200 mt-0.5">확인 중...</div>
           </div>
           <div id="krxMainBadge" class="p-2 rounded-lg bg-slate-800 text-slate-400">
@@ -130,13 +141,13 @@
           </div>
         </div>
 
-        <!-- KRX NXT -->
+        <!-- KRX & NXT After-market -->
         <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
           <div>
-            <div class="text-xs text-slate-400">국내 야간 대체거래소 (NXT)</div>
-            <div id="krxNxtText" class="text-sm font-bold text-slate-200 mt-0.5">확인 중...</div>
+            <div class="text-xs text-slate-400">국내 통합 애프터마켓</div>
+            <div id="krxAfterText" class="text-sm font-bold text-slate-200 mt-0.5">확인 중...</div>
           </div>
-          <div id="krxNxtBadge" class="p-2 rounded-lg bg-slate-800 text-slate-400">
+          <div id="krxAfterBadge" class="p-2 rounded-lg bg-slate-800 text-slate-400">
             <i class="fa-solid fa-spinner fa-spin"></i>
           </div>
         </div>
@@ -144,7 +155,7 @@
         <!-- US Regular -->
         <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
           <div>
-            <div class="text-xs text-slate-400">미국 정규 증시 (NYSE/NASDAQ)</div>
+            <div class="text-xs text-slate-400">미국 정규 증시 (NYSE/NQ)</div>
             <div id="usMainText" class="text-sm font-bold text-slate-200 mt-0.5">확인 중...</div>
           </div>
           <div id="usMainBadge" class="p-2 rounded-lg bg-slate-800 text-slate-400">
@@ -206,31 +217,41 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- KRX Regular -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- NXT Pre-market -->
         <label class="relative flex flex-col p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition select-none">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-sky-400 px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20">평일 15:40 KST</span>
+            <span class="text-xs font-bold text-amber-400 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20">평일 08:55 KST</span>
+            <input type="checkbox" id="krxPre" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
+          </div>
+          <div class="font-bold text-sm text-slate-200">국내 프리마켓 마감</div>
+          <div class="text-xs text-slate-400 mt-1">NXT 프리마켓(08:00~08:50) 마감 및 개장 준비 브리핑</div>
+        </label>
+
+        <!-- KRX Regular Main -->
+        <label class="relative flex flex-col p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition select-none">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-sky-400 px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20">평일 15:35 KST</span>
             <input type="checkbox" id="krxMain" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
           </div>
           <div class="font-bold text-sm text-slate-200">국내 정규장 마감 리포트</div>
-          <div class="text-xs text-slate-400 mt-1">KOSPI &amp; KOSDAQ 시가총액 상위 종목 변동 분석</div>
+          <div class="text-xs text-slate-400 mt-1">KRX &amp; NXT 정규장(09:00~15:30) 종가 시총 변동 분석</div>
         </label>
 
-        <!-- KRX NXT -->
+        <!-- KRX & NXT After-market -->
         <label class="relative flex flex-col p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition select-none">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-purple-400 px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">평일 20:10 KST</span>
-            <input type="checkbox" id="krxNxt" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
+            <span class="text-xs font-bold text-purple-400 px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20">평일 20:05 KST</span>
+            <input type="checkbox" id="krxAfter" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
           </div>
-          <div class="font-bold text-slate-200 text-sm">국내 야간대체거래소(NXT) 마감</div>
-          <div class="text-xs text-slate-400 mt-1">20:00 마감 후 야간 거래 반영 시총 변동 분석</div>
+          <div class="font-bold text-slate-200 text-sm">국내 통합 애프터마켓 마감</div>
+          <div class="text-xs text-slate-400 mt-1">KRX(16:00~20:00) &amp; NXT(15:40~20:00) 실시간 접속매매 최종 분석</div>
         </label>
 
         <!-- US Regular -->
         <label class="relative flex flex-col p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition select-none">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">화~토 06:10 KST</span>
+            <span class="text-xs font-bold text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">화~토 05:05/06:05</span>
             <input type="checkbox" id="usMain" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
           </div>
           <div class="font-bold text-slate-200 text-sm">미국 증시 마감 리포트</div>
@@ -355,26 +376,33 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <button type="button" id="btnPreviewKrxPre" onclick="handlePreviewReport('krxPre', 'btnPreviewKrxPre')"
+                class="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-amber-500/40 transition flex flex-col items-center justify-center gap-2 text-center group cursor-pointer">
+          <i class="fa-solid fa-sun text-amber-400 text-2xl group-hover:scale-110 transition"></i>
+          <span class="font-bold text-sm text-slate-200">국내 프리마켓 리포트</span>
+          <span class="text-[11px] text-slate-400">08:55 마감 미리보기</span>
+        </button>
+
         <button type="button" id="btnPreviewKrxMain" onclick="handlePreviewReport('krxMain', 'btnPreviewKrxMain')"
                 class="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-sky-500/40 transition flex flex-col items-center justify-center gap-2 text-center group cursor-pointer">
           <i class="fa-solid fa-chart-pie text-sky-400 text-2xl group-hover:scale-110 transition"></i>
           <span class="font-bold text-sm text-slate-200">국내 정규장 리포트</span>
-          <span class="text-[11px] text-slate-400">미리보기 &amp; 즉시 발송</span>
+          <span class="text-[11px] text-slate-400">15:35 마감 미리보기</span>
         </button>
 
-        <button type="button" id="btnPreviewKrxNxt" onclick="handlePreviewReport('krxNxt', 'btnPreviewKrxNxt')"
+        <button type="button" id="btnPreviewKrxAfter" onclick="handlePreviewReport('krxAfter', 'btnPreviewKrxAfter')"
                 class="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-purple-500/40 transition flex flex-col items-center justify-center gap-2 text-center group cursor-pointer">
           <i class="fa-solid fa-moon text-purple-400 text-2xl group-hover:scale-110 transition"></i>
-          <span class="font-bold text-sm text-slate-200">국내 야간 NXT장 리포트</span>
-          <span class="text-[11px] text-slate-400">미리보기 &amp; 즉시 발송</span>
+          <span class="font-bold text-sm text-slate-200">국내 애프터마켓 리포트</span>
+          <span class="text-[11px] text-slate-400">20:05 마감 미리보기</span>
         </button>
 
         <button type="button" id="btnPreviewUsMain" onclick="handlePreviewReport('usMain', 'btnPreviewUsMain')"
                 class="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-500/40 transition flex flex-col items-center justify-center gap-2 text-center group cursor-pointer">
           <i class="fa-solid fa-globe text-emerald-400 text-2xl group-hover:scale-110 transition"></i>
           <span class="font-bold text-sm text-slate-200">미국 정규 증시 리포트</span>
-          <span class="text-[11px] text-slate-400">미리보기 &amp; 즉시 발송</span>
+          <span class="text-[11px] text-slate-400">05:05/06:05 미리보기</span>
         </button>
       </div>
     </section>
@@ -495,8 +523,9 @@
         todayDateEl.innerText = (status.today || status.nowKst || '') + ' KST 기준';
       }
       
-      updateMarketBadge('krxMainText', 'krxMainBadge', status.krxMain, 'krx');
-      updateMarketBadge('krxNxtText', 'krxNxtBadge', status.krxNxt, 'nxt');
+      updateMarketBadge('krxPreText', 'krxPreBadge', status.krxPre, 'pre');
+      updateMarketBadge('krxMainText', 'krxMainBadge', status.krxMain, 'main');
+      updateMarketBadge('krxAfterText', 'krxAfterBadge', status.krxAfter || status.krxNxt, 'after');
       updateMarketBadge('usMainText', 'usMainBadge', status.us, 'us');
     }
 
@@ -506,12 +535,16 @@
       if (!textEl || !badgeEl || !marketInfo) return;
 
       const state = marketInfo.sessionState || (marketInfo.isOpen ? 'in_session' : 'closed');
-      const statusText = marketInfo.statusText || (marketInfo.isOpen ? `정규 개장 (${marketInfo.dayOfWeek}요일)` : `휴장 (${marketInfo.reason || '휴장일'})`);
+      const statusText = marketInfo.statusText || (marketInfo.isOpen ? `개장 중 (${marketInfo.dayOfWeek}요일)` : `휴장 (${marketInfo.reason || '휴장일'})`);
 
       textEl.innerText = statusText;
 
       if (state === 'in_session') {
-        if (type === 'nxt') {
+        if (type === 'pre') {
+          badgeEl.className = 'p-2 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30';
+          badgeEl.innerHTML = '<i class="fa-solid fa-sun animate-pulse"></i>';
+          textEl.className = 'text-sm font-bold text-amber-400 mt-0.5';
+        } else if (type === 'after' || type === 'nxt') {
           badgeEl.className = 'p-2 rounded-lg bg-purple-500/15 text-purple-400 border border-purple-500/30';
           badgeEl.innerHTML = '<i class="fa-solid fa-moon animate-pulse"></i>';
           textEl.className = 'text-sm font-bold text-purple-400 mt-0.5';
@@ -791,9 +824,10 @@
         }]);
       }
       
-      document.getElementById('krxMain').checked = !!config.krxMain;
-      document.getElementById('krxNxt').checked = !!config.krxNxt;
-      document.getElementById('usMain').checked = !!config.usMain;
+      document.getElementById('krxPre').checked = (config.krxPre !== false);
+      document.getElementById('krxMain').checked = (config.krxMain !== false);
+      document.getElementById('krxAfter').checked = (config.krxAfter !== false && config.krxNxt !== false);
+      document.getElementById('usMain').checked = (config.usMain !== false);
       document.getElementById('skipHolidays').checked = (config.skipHolidays !== false);
       
       document.getElementById('topN').value = config.topN || 20;
@@ -817,13 +851,16 @@
       syncStateFromDom();
       
       const primaryBot = telegramBotsList[0] || {};
+      const isAfterChecked = document.getElementById('krxAfter').checked;
       
       return {
         telegramBots: telegramBotsList,
         telegramToken: primaryBot.token || '',
         telegramChatId: primaryBot.chatId || '',
+        krxPre: document.getElementById('krxPre').checked,
         krxMain: document.getElementById('krxMain').checked,
-        krxNxt: document.getElementById('krxNxt').checked,
+        krxAfter: isAfterChecked,
+        krxNxt: isAfterChecked, // 하위 호환 동기화
         usMain: document.getElementById('usMain').checked,
         skipHolidays: document.getElementById('skipHolidays').checked,
         topN: parseInt(document.getElementById('topN').value, 10) || 20,
@@ -964,9 +1001,12 @@
       
       let fnName = 'sendManualKrxMainReport';
       let label = '국내 정규장';
-      if (currentPreviewMarketType === 'krxNxt') {
-        fnName = 'sendManualKrxNxtReport';
-        label = '국내 NXT장';
+      if (currentPreviewMarketType === 'krxPre') {
+        fnName = 'sendManualKrxPreReport';
+        label = '국내 프리마켓';
+      } else if (currentPreviewMarketType === 'krxAfter' || currentPreviewMarketType === 'krxNxt') {
+        fnName = 'sendManualKrxAfterReport';
+        label = '국내 애프터마켓';
       } else if (currentPreviewMarketType === 'usMain') {
         fnName = 'sendManualUsReport';
         label = '미국 마감장';

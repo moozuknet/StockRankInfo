@@ -4,89 +4,142 @@
   <base target="_top">
   <title>DEVELOPMENT GUIDE - 증시 시가총액 변동 분석 & 텔레그램 자동 발송</title>
   <style>
-    body { font-family: monospace, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; line-height: 1.6; }
-    pre { white-space: pre-wrap; word-wrap: break-word; background: #1e293b; padding: 16px; border-radius: 8px; border: 1px solid #334155; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; line-height: 1.6; max-width: 960px; margin: 0 auto; }
+    h1, h2, h3 { color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 6px; margin-top: 24px; }
+    pre { white-space: pre-wrap; word-wrap: break-word; background: #1e293b; padding: 16px; border-radius: 8px; border: 1px solid #334155; font-family: monospace; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    th, td { border: 1px solid #334155; padding: 10px 12px; text-align: left; }
+    th { background: #1e293b; color: #38bdf8; }
+    tr:nth-child(even) { background: #0f172a; }
+    tr:nth-child(odd) { background: #131d33; }
+    code { background: #1e293b; color: #f472b6; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
   </style>
 </head>
 <body>
-  <h1>🛠 DEVELOPMENT GUIDE - 증시 시가총액 변동 분석 & 텔레그램 자동 발송</h1>
-  <pre>
-# 🛠 개발 및 배포 가이드 (DEVELOPMENT GUIDE)
+  <h1>🛠 DEVELOPMENT GUIDE - 증시 시가총액 변동 분석 &amp; 텔레그램 자동 발송</h1>
+  <p>본 문서는 <b>Google Apps Script(GAS)</b> 프로젝트 생성부터 텔레그램 봇 연동, Clasp CLI 자동화 배포, 2026년 9월 14일 개편된 KRX/NXT(대체거래소) 최신 운영시간 기준의 시간대별 Market Data Engine 파이프라인 구조, 및 보안 유지보수에 대한 종합 개발 가이드입니다.</p>
 
-본 문서는 **Google Apps Script(GAS)** 프로젝트 생성부터 텔레그램 봇 연동, Clasp CLI 자동화 배포, Market Data Engine 파이프라인 구조, 및 보안 유지보수에 대한 종합 개발 가이드입니다.
-
----
-
-## 1. 📝 Google Apps Script 프로젝트 구성 및 Clasp CLI 자동화
-
-### 1) Clasp CLI를 이용한 로컬 코드 푸시 및 배포
-본 프로젝트는 Google `clasp` CLI를 통해 로컬 환경에서 온라인 GAS 프로젝트로 소스 코드를 즉시 업로드하고 버전을 관리합니다.
-
-```bash
-# 1. 의존성 및 clasp 설치 확인
+  <h2>1. 📝 Google Apps Script 프로젝트 구성 및 Clasp CLI 자동화</h2>
+  <pre><code># 1. 의존성 및 clasp 설치 확인
 npx clasp --version
 
 # 2. 로컬 코드 온라인 GAS 프로젝트로 강제 푸시 (.claspignore 자동 적용)
 npx clasp push --force
 
 # 3. 새로운 버전 생성 및 배포 (Production Web App)
-npx clasp deploy --description "v1.8 Release - Market Data Engine & Security Enhancements"
+npx clasp deploy --description "v2.0 Release - KRX/NXT Time-based Multi-session Engine"
 
 # 4. 활성화된 배포 목록 및 실행 ID 확인
-npx clasp deployments
+npx clasp deployments</code></pre>
 
-# 5. 불필요한 구버전 배포 해제 (단일 프로덕션 버전 유지)
-npx clasp undeploy <DEPLOYMENT_ID>
-```
+  <h2>2. ⏰ 2026.09.14 KRX &amp; NXT 시장 운영시간 전면 개편 명세</h2>
+  <p>2026년 9월 14일부터 한국 주식시장에 대체거래소(NXT, 넥스트레이드)와의 복수 거래소 경쟁 체제가 본격 가동되며 마켓별 운영 시간 및 거래 제도가 획기적으로 개편되었습니다.</p>
 
----
+  <table>
+    <thead>
+      <tr>
+        <th>구분</th>
+        <th>넥스트레이드 (NXT 대체거래소)</th>
+        <th>한국거래소 (KRX)</th>
+        <th>비고 및 주요 특징</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>프리마켓 (Pre-market)</b></td>
+        <td><b>08:00 ~ 08:50</b></td>
+        <td>미운영 (2027년 말 도입 예정)</td>
+        <td>장 시작 전 실시간 접속매매 (출근길 거래 선점)</td>
+      </tr>
+      <tr>
+        <td><b>메인마켓 (정규장)</b></td>
+        <td><b>09:00:30 ~ 15:20</b></td>
+        <td><b>09:00 ~ 15:30</b></td>
+        <td>정규 거래 세션 (KRX와 NXT 동시 운영)</td>
+      </tr>
+      <tr>
+        <td><b>장후 시간외종가</b></td>
+        <td>-</td>
+        <td><b>15:40 ~ 16:00</b></td>
+        <td>당일 정규장 종가 고정 가격 매매</td>
+      </tr>
+      <tr>
+        <td><b>애프터마켓 (After-market)</b></td>
+        <td><b>15:40 ~ 20:00</b></td>
+        <td><b>16:00 ~ 20:00</b></td>
+        <td>기존 10분 단위 시간외단일가 폐지 &rarr; <b>실시간 접속매매 전면 도입</b></td>
+      </tr>
+    </tbody>
+  </table>
 
-## 2. 📊 Market Data Engine 파이프라인 및 연산 구조 (`Code.gs`)
+  <h3>2026.09.14 개편 주요 제도 변경사항</h3>
+  <ul>
+    <li><b>체결 방식 혁신:</b> 기존의 10분 단위 단일가 호출매매가 폐지되고, 정규장과 동일하게 호가가 일치하면 즉시 체결되는 <b>실시간 접속매매(Continuous Trading)</b> 방식으로 변경되었습니다.</li>
+    <li><b>가격 제한폭 대폭 확대:</b> 기존 시간외단일가(당일 종가 대비 &plusmn;10%)에서 정규장과 동일한 <b>전일 종가 대비 &plusmn;30%</b>로 확대되었습니다.</li>
+    <li><b>주문 효력 및 스마트 주문(SOR):</b> NXT는 프리마켓&rarr;메인마켓&rarr;애프터마켓까지 단일 세션으로 주문 효력이 유지되며, 증권사 SOR(최선집행서비스)을 통해 두 거래소 중 유리한 곳으로 자동 분기됩니다.</li>
+    <li><b>거래 대상 및 제외 종목:</b> 변동성 관리를 위해 <b>ETF(상장지수펀드) 및 ETN(상장지수증권)</b>은 현재 양대 거래소 모두 애프터마켓 거래 대상에서 제외됩니다.</li>
+  </ul>
 
-본 시스템은 AI(LLM) 질의응답을 거치지 않으며, **100% 실시간 웹 API 파싱 및 결정론적(Deterministic) 연산 엔진**으로 동작합니다.
+  <h2>3. 📊 시간대별 4대 Market Data Engine 파이프라인 (`Code.gs`)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>발송 시각 (KST)</th>
+        <th>핸들러 함수</th>
+        <th>세션 타이틀</th>
+        <th>핵심 분석 내용</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>평일 08:55</b></td>
+        <td><code>sendKrxPreReport</code></td>
+        <td><code>[🌅 국내 장전 프리마켓 마감 시총 분석]</code></td>
+        <td>NXT 프리마켓(08:00~08:50) 체결 마감 직후 장전 수급 및 당일 개장 준비 시총/변동 분석</td>
+      </tr>
+      <tr>
+        <td><b>평일 15:35</b></td>
+        <td><code>sendKrxMainReport</code></td>
+        <td><code>[📊 국내 정규장 마감 시총 분석]</code></td>
+        <td>KRX(15:30) 및 NXT(15:20) 정규 메인마켓 종가 확정 후 당일 시총 랭킹 및 순위 변동 분석</td>
+      </tr>
+      <tr>
+        <td><b>평일 20:05</b></td>
+        <td><code>sendKrxAfterReport</code></td>
+        <td><code>[🌙 국내 통합 애프터마켓 마감 시총 분석]</code></td>
+        <td>20:00 KRX &amp; NXT 애프터마켓 완전 마감 직후 실시간 접속매매 반영 최종 시총 및 변동 분석</td>
+      </tr>
+      <tr>
+        <td><b>화~토 05:05/06:05</b></td>
+        <td><code>sendUsReport</code></td>
+        <td><code>[🇺🇸 미국 증시 마감 시총 분석]</code></td>
+        <td>미국 본장(16:00 EDT/EST) 마감 후 엔비디아/빅테크 중심 글로벌 시총 변동 분석</td>
+      </tr>
+    </tbody>
+  </table>
 
-### 1) 실시간 데이터 파싱 (`fetchKrxMarketData`, `fetchUsMarketData`)
-- **KRX (KOSPI/KOSDAK)**: 네이버 증권 모바일 API (`https://m.stock.naver.com/api/stocks/marketValue/...`) 직접 수집.
-  - `closePriceRaw` (현재 종가 원화)
-  - `fluctuationsRatio` (당일 등락률 %)
-  - `marketValueHangeul` (한글 시가총액 조/억원)
-- **US (NASDAQ/NYSE)**: Yahoo Finance Query v7 API 수집 및 Google Finance 링크 매핑.
+  <h2>4. 🤖 Telegram Bot 생성 및 다중 봇 등록 절차</h2>
+  <ol>
+    <li><code>@BotFather</code>를 통해 Bot Token 생성.</li>
+    <li><code>@userinfobot</code> 또는 <code>getUpdates</code>를 통해 Chat ID 수집.</li>
+    <li>Web UI 접속 후 <code>[+ 새 봇 추가]</code>로 여러 봇(별칭, Bot Token, Chat ID) 등록 및 활성화 제어.</li>
+    <li>각 카드별 <code>[이 봇으로 테스트 발송]</code> 또는 <code>[활성 봇 전체 테스트 발송]</code> 확인 후 <code>[💾 설정 저장]</code>.</li>
+  </ol>
 
-### 2) 과거 비교 및 과거 시가총액 산출 수식 (`calculateHistoricalChanges`)
-- **KRX 상위 40개 종목 팩트 DB (`KRX_HISTORICAL_MAP`)**:
-  - 1일 전, 5일 전, 1개월 전, 3개월 전, 1년 전 과거 순위(`pastRank`)와 등락률(`returnRate`) 팩트 매핑.
-- **순위 변동폭 산출 수식**:
-  `rankShift = pastRank - currentRank`
-  - `rankShift > 0`: 상승 (`▲X계단`), `+10` 이상은 `🚀`, `+5` 이상은 `🔥`
-  - `rankShift < 0`: 하락 (`▼X계단`), `-10` 이상은 `🚨`
-  - `rankShift === 0`: 유지 (`유지`)
-- **과거 시가총액 역산 수식 (`config.showPastCap`)**:
-  `과거 시가총액 = 현재 시가총액 / (1 + (과거 대비 등락률(%) / 100))`
+  <h2>5. ⏰ 서머타임(DST) 판별 및 스케줄링 디버깅</h2>
+  <ul>
+    <li>미국 동부 시간대(ET) 3월 2번째 일요일 02:00 ~ 11월 1번째 일요일 02:00 구간을 판별합니다.
+      <ul>
+        <li><b>EDT (서머타임)</b>: 미국 마감 16:00 EDT = KST 다음날 <b>05:00</b> &rarr; 발송 트리거: <b>05:05 KST</b></li>
+        <li><b>EST (표준시)</b>: 미국 마감 16:00 EST = KST 다음날 <b>06:00</b> &rarr; 발송 트리거: <b>06:05 KST</b></li>
+      </ul>
+    </li>
+  </ul>
 
----
-
-## 3. 🤖 Telegram Bot 생성 및 다중 봇 등록 절차
-
-1. `@BotFather`를 통해 Bot Token 생성.
-2. `@userinfobot` 또는 `getUpdates`를 통해 Chat ID 수집.
-3. Web UI 접속 후 `[+ 새 봇 추가]`로 여러 봇(별칭, Bot Token, Chat ID) 등록 및 활성화 제어.
-4. 각 카드별 `[이 봇으로 테스트 발송]` 또는 `[활성 봇 전체 테스트 발송]` 확인 후 `[💾 설정 저장]`.
-
----
-
-## 4. ⏰ 서머타임(DST) 판별 및 스케줄링 디버깅
-
-- 미국 동부 시간대(ET) 3월 2번째 일요일 02:00 ~ 11월 1번째 일요일 02:00 구간을 판별합니다.
-  - **EDT (서머타임)**: 미국 마감 16:00 EDT = KST 다음날 **05:00** -> 발송 트리거: **05:05 KST**
-  - **EST (표준시)**: 미국 마감 16:00 EST = KST 다음날 **06:00** -> 발송 트리거: **06:05 KST**
-
----
-
-## 5. 🔒 보안 및 깃허브(GitHub) 동기화 정책
-
-1. **배포 URL 및 인증 토큰 비공개 정책**:
-   - `README.md` 및 `DEVELOPMENT_GUIDE.md` 등 공개 문서에는 개인 배포 Exec URL 및 Bot Token을 직접 기재하지 않습니다.
-   - 마스킹된 스크린샷 에셋(`assets/dashboard_preview.png`)을 사용합니다.
-  </pre>
+  <h2>6. 🔒 보안 및 깃허브(GitHub) 동기화 정책</h2>
+  <ol>
+    <li><b>배포 URL 및 인증 토큰 비공개 정책:</b> <code>README.md</code> 및 <code>DEVELOPMENT_GUIDE.md</code> 등 공개 문서에는 개인 배포 Exec URL 및 Bot Token을 직접 기재하지 않습니다.</li>
+    <li><b>마스킹된 스크린샷 에셋:</b> <code>assets/dashboard_preview.png</code>를 사용합니다.</li>
+  </ol>
 </body>
 </html>
