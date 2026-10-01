@@ -65,9 +65,9 @@ npx clasp undeploy <DEPLOYMENT_ID>
 
 ---
 
-## 3. 📊 시간대별 4대 Market Data Engine 파이프라인 (`Code.gs`)
+## 3. 📊 시간대별 Market Data Engine 및 KOSPI / KOSDAK · 섹터 파이프라인 (`Code.gs`)
 
-본 시스템은 최신 마켓 운영 시간에 맞추어 **시간대별 4대 세션 파이프라인**을 독립적으로 구성하여 시가총액 변동과 수급을 정밀 분석합니다.
+본 시스템은 최신 마켓 운영 시간에 맞추어 **시간대별 4대 세션 파이프라인**을 독립적으로 구성하며, 국내 증시 분석 시 **코스피(KOSPI)와 코스닥(KOSDAK)을 명확히 분리하여 각각 분석**하고 **종목별 표준 WICS 섹터(업종) 정보**를 결합하여 수급과 모멘텀을 정밀 분석합니다.
 
 ```mermaid
 flowchart TD
@@ -78,24 +78,36 @@ flowchart TD
         T4["화~토 05:05/06:05 KST<br>(sendUsReport)"]
     end
 
-    subgraph DataEngine["⚙️ Market Data Engine"]
-        API1["네이버 증권 Mobile API<br>(KOSPI / KOSDAK)"]
-        API2["Yahoo Finance v7 API<br>(NYSE / NASDAQ)"]
+    subgraph DataEngine["⚙️ Market Data Engine & Pipelines"]
+        direction TB
+        subgraph MarketSplit["🇰🇷 국내 시장 분리 수집 (KOSPI / KOSDAK)"]
+            API_KOSPI["네이버 증권 KOSPI API<br>(유가증권 대형주)"]
+            API_KOSDAK["네이버 증권 KOSDAK API<br>(혁신성장/중소형주)"]
+        end
+        subgraph SectorEngine["🏢 WICS 섹터(업종) 매핑 엔진"]
+            WICS_MAP["WICS 79개 업종 코드 체계<br>(NAVER_INDUSTRY_MAP)"]
+            SECTOR_CACHE["대형주 팩트 섹터 캐시 DB<br>(KNOWN_SECTOR_MAP)"]
+            SECTOR_DYNAMIC["실시간 industryCode 동적 분석"]
+        end
+        API_US["Yahoo Finance v7 API<br>(NYSE / NASDAQ)"]
         DB[(KRX_HISTORICAL_MAP)]
         Engine["Historical Calculation & Momentum Engine"]
     end
 
     subgraph TelegramAlerts["📱 멀티 봇 텔레그램 리포트"]
-        R1["[🌅 국내 장전 프리마켓 마감 시총 분석]"]
-        R2["[📊 국내 정규장 마감 시총 분석]"]
-        R3["[🌙 국내 통합 애프터마켓 마감 시총 분석]"]
+        R1["[🌅 국내 프리마켓 - 코스피/코스닥 마감 시총 분석]"]
+        R2["[📊 국내 정규장 - 코스피/코스닥 마감 시총 분석]"]
+        R3["[🌙 국내 애프터마켓 - 코스피/코스닥 마감 시총 분석]"]
         R4["[🇺🇸 미국 증시 마감 시총 분석]"]
     end
 
-    T1 --> API1 --> Engine
-    T2 --> API1 --> Engine
-    T3 --> API1 --> Engine
-    T4 --> API2 --> Engine
+    T1 --> API_KOSPI & API_KOSDAK
+    T2 --> API_KOSPI & API_KOSDAK
+    T3 --> API_KOSPI & API_KOSDAK
+    T4 --> API_US
+
+    API_KOSPI & API_KOSDAK --> SectorEngine --> Engine
+    API_US --> Engine
     DB --> Engine
 
     Engine --> R1
@@ -104,17 +116,42 @@ flowchart TD
     Engine --> R4
 ```
 
-### 1) 시간대별 리포팅 세부 명세
+### 1) 코스피(KOSPI) & 코스닥(KOSDAK) 분리 수집 및 독립 설정 명세
+1. **분리 배경 및 필요성**:
+   - 기존 통합 수집 방식에서는 KOSPI 대형주의 시총 규모가 압도적이어서, 알테오젠(코스닥 1위) 등 코스닥 핵심 주도주가 전체 순위에서 누락되는 문제가 있었습니다.
+   - KOSPI(반도체/자동차/금융 등 대형 가치주)와 KOSDAK(바이오/2차전지/로봇/엔터 등 성장주)의 시장 특성에 맞추어 **각각 상위 Top N(기본 20개)을 독립 산출**합니다.
+2. **수신 설정 필드 (Config)**:
+   - `enableKospi` (boolean, 기본값 `true`): 코스피 시장 분석 리포트 수신 여부
+   - `enableKosdak` (boolean, 기본값 `true`): 코스닥 시장 분석 리포트 수신 여부
+   - 사용자가 원하는 시장만 단독 선택(코스피만 또는 코스닥만)하거나 양대 시장을 모두 선택하여 맞춤형 브리핑을 수신할 수 있습니다.
+3. **독립 발송 프로세스**:
+   - 설정에 따라 각 세션 시점에 `enableKospi` 활성화 시 KOSPI 리포트를, `enableKosdak` 활성화 시 KOSDAK 리포트를 순차 전송하여 텔레그램 4,096자 제한을 방지하고 가독성을 극대화합니다.
 
-| 발송 시각 (KST) | 핸들러 함수 | 세션 타이틀 | 핵심 분석 내용 |
+### 2) 종목별 섹터(업종) 정보 연동 파이프라인
+1. **WICS 79개 표준 업종 체계 연동**:
+   - 네이버 증권 WICS(FnGuide) 79개 표준 업종 분류 코드(`NAVER_INDUSTRY_MAP`)를 탑재합니다.
+2. **2계층 하이브리드 섹터 조회 엔진**:
+   - **Layer 1 (0ms 정밀 캐시)**: 코스피/코스닥/미국 상위 대형주 약 100종목의 팩트 섹터 캐시(`KNOWN_SECTOR_MAP`)를 우선 조회하여 네트워크 비용 0 및 즉시 응답을 보장합니다.
+   - **Layer 2 (동적 실시간 연동)**: 신규 상장주나 급등주 등 캐시에 없는 종목은 네이버 모바일 통합 API(`https://m.stock.naver.com/api/stock/{code}/integration`)의 `industryCode`를 조회하여 정확한 섹터명을 부여합니다.
+3. **리포트 서식 내 섹터 메타데이터 노출**:
+   - 설정 옵션 `showSector` (boolean, 기본값 `true`) 지원.
+   - 서식 예시:
+     `#1 삼성전자 (KOSPI · 반도체와반도체장비)`
+     `#1 알테오젠 (KOSDAK · 생물공학)`
+     `#1 NVIDIA (NASDAQ · 반도체/AI)`
+   - 수급 핵심 요약(`generateAnalystSummary`)에서도 급등락 종목 노출 시 소속 섹터를 함께 표기하여 주도 업종 트렌드를 한눈에 파악할 수 있도록 제공합니다.
+
+### 3) 시간대별 리포팅 세부 명세
+
+| 발송 시각 (KST) | 핸들러 함수 | 시장 구분 및 타이틀 | 핵심 분석 내용 |
 | :--- | :--- | :--- | :--- |
-| **평일 08:55** | `sendKrxPreReport` | `[🌅 국내 장전 프리마켓 마감 시총 분석]` | NXT 프리마켓(08:00~08:50) 체결 마감 직후 장전 수급 및 당일 개장 준비 시총/변동 분석 |
-| **평일 15:35** | `sendKrxMainReport` | `[📊 국내 정규장 마감 시총 분석]` | KRX(15:30) 및 NXT(15:20) 정규 메인마켓 종가 확정 후 당일 시총 랭킹 및 순위 변동 분석 |
-| **평일 20:05** | `sendKrxAfterReport` | `[🌙 국내 통합 애프터마켓 마감 시총 분석]` | 20:00 KRX & NXT 애프터마켓 완전 마감 직후 실시간 접속매매 반영 최종 시총 및 변동 분석 |
-| **화~토 05:05/06:05** | `sendUsReport` | `[🇺🇸 미국 증시 마감 시총 분석]` | 미국 본장(16:00 EDT/EST) 마감 후 엔비디아/빅테크 중심 글로벌 시총 변동 분석 |
+| **평일 08:55** | `sendKrxPreReport` | `[🌅 국내 프리마켓 - 코스피/코스닥 마감 시총 분석]` | NXT 프리마켓(08:00~08:50) 체결 마감 직후 시장별 장전 수급 및 당일 개장 준비 시총/섹터 변동 분석 |
+| **평일 15:35** | `sendKrxMainReport` | `[📊 국내 정규장 - 코스피/코스닥 마감 시총 분석]` | KRX(15:30) 및 NXT(15:20) 정규 메인마켓 종가 확정 후 시장별 시총 랭킹, 섹터 동향 및 순위 변동 분석 |
+| **평일 20:05** | `sendKrxAfterReport` | `[🌙 국내 애프터마켓 - 코스피/코스닥 마감 시총 분석]` | 20:00 KRX & NXT 애프터마켓 완전 마감 직후 실시간 접속매매 반영 최종 시장별 시총 및 섹터 변동 분석 |
+| **화~토 05:05/06:05** | `sendUsReport` | `[🇺🇸 미국 증시 마감 시총 분석]` | 미국 본장(16:00 EDT/EST) 마감 후 엔비디아/빅테크 중심 글로벌 시총 변동 및 테크 섹터 분석 |
 
-### 2) 과거 비교 및 시가총액 산출 수식 (`calculateHistoricalChanges`)
-- **KRX 상위 40개 종목 팩트 DB (`KRX_HISTORICAL_MAP`)**:
+### 4) 과거 비교 및 시가총액 산출 수식 (`calculateHistoricalChanges`)
+- **KRX 주요 종목 팩트 DB (`KRX_HISTORICAL_MAP`)**:
   - 1일 전, 5일 전, 1개월 전, 3개월 전, 1년 전 과거 순위(`pastRank`)와 등락률(`returnRate`) 팩트 매핑.
 - **순위 변동폭 산출 수식**:
   $$\text{rankShift} = \text{pastRank} - \text{currentRank}$$

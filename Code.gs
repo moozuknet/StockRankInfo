@@ -300,6 +300,164 @@ const KRX_HISTORICAL_MAP = {
 };
 
 // ============================================================================
+// 1-1. WICS 표준 업종 코드 및 섹터 팩트 캐시 데이터베이스
+// ============================================================================
+
+const NAVER_INDUSTRY_MAP = {
+  286: '생물공학', 262: '생명과학도구및서비스', 263: '게임엔터테인먼트', 282: '전자장비와기기', 261: '제약',
+  269: '디스플레이장비및부품', 284: '우주항공과국방', 278: '반도체와반도체장비', 277: '창업투자', 265: '판매업체',
+  270: '자동차부품', 299: '기계', 327: '디스플레이패널', 294: '통신장비', 316: '건강관리업체및서비스',
+  281: '건강관리장비와용품', 292: '핸드셋', 308: '인터넷과카탈로그소매', 287: '소프트웨어', 272: '화학',
+  323: '해운사', 267: 'IT서비스', 283: '전기제품', 321: '증권', 25: '기타', 271: '레저용장비와제품',
+  329: '도로와철도운송', 325: '전기유틸리티', 266: '화장품', 332: '문구류', 273: '자동차', 314: '출판',
+  298: '가정용기기와용품', 317: '호텔,레스토랑,레저', 274: '섬유,의류,신발,호화품', 288: '건강관리기술',
+  324: '상업서비스와공급품', 304: '철강', 318: '종이와목재', 311: '포장재', 326: '항공화물운송과물류',
+  333: '무선통신서비스', 296: '운송인프라', 276: '복합기업', 295: '에너지장비및서비스', 268: '식품',
+  290: '교육서비스', 328: '전문소매', 306: '전기장비', 303: '가구', 309: '음료', 330: '생명보험',
+  322: '비철금속', 289: '건축자재', 280: '부동산', 293: '컴퓨터와주변기기', 310: '광고', 319: '기타금융',
+  312: '가스유틸리티', 279: '건설', 320: '건축제품', 331: '복합유틸리티', 275: '담배', 338: '사무용전자제품',
+  307: '전자제품', 291: '조선', 300: '양방향미디어와서비스', 336: '다각화된통신서비스', 285: '방송과엔터테인먼트',
+  337: '카드', 315: '손해보험', 301: '은행', 264: '백화점과일반상점', 302: '식품과기본식료품소매',
+  339: '다각화된소비자서비스', 305: '항공사', 297: '가정용품', 334: '무역회사와판매업체', 313: '석유와가스'
+};
+
+const KNOWN_SECTOR_MAP = {
+  // KOSPI 대형주
+  '005930': '반도체와반도체장비',
+  '000660': '반도체와반도체장비',
+  '005935': '반도체와반도체장비',
+  '402340': '창업투자',
+  '009150': '전자장비와기기',
+  '005380': '자동차',
+  '373220': '전기제품',
+  '207940': '제약',
+  '032830': '생명보험',
+  '028260': '복합기업',
+  '012450': '우주항공과국방',
+  '105560': '은행',
+  '000270': '자동차',
+  '329180': '조선',
+  '034020': '기계',
+  '055550': '은행',
+  '012330': '자동차부품',
+  '068270': '제약',
+  '034730': '복합기업',
+  '006400': '전기제품',
+  '086790': '은행',
+  '035420': '양방향미디어와서비스',
+  '066570': '가전/전자',
+  '010120': '전기장비',
+  '042660': '조선',
+  '267260': '전기장비',
+  '298040': '전기장비',
+  '000810': '손해보험',
+  '009540': '조선',
+  '005490': '철강',
+  '035720': '양방향미디어와서비스',
+  '011200': '해운사',
+  '259960': '게임엔터테인먼트',
+  '010130': '비철금속',
+  '033780': '담배',
+  '018260': 'IT서비스',
+  '003670': '화학',
+  '051910': '화학',
+  '015760': '전기유틸리티',
+  '096770': '석유와가스',
+  '323410': '은행',
+  '003550': '복합기업',
+  '024110': '은행',
+  '017670': '무선통신서비스',
+  '010140': '조선',
+  '030200': '무선통신서비스',
+  '000100': '제약',
+  '036570': '게임엔터테인먼트',
+  '003490': '항공사',
+  '000120': '제약',
+
+  // KOSDAQ 대형주
+  '196170': '생물공학',
+  '247540': '전기제품',
+  '086520': '전기제품',
+  '277810': '기계',
+  '028300': '제약/생물공학',
+  '058470': '반도체와반도체장비',
+  '403870': '반도체와반도체장비',
+  '035900': '방송과엔터테인먼트',
+  '357780': '화학',
+  '263750': '게임엔터테인먼트',
+  '145020': '제약',
+  '041510': '방송과엔터테인먼트',
+  '293490': '게임엔터테인먼트',
+  '036930': '반도체와반도체장비',
+  '039030': '반도체와반도체장비',
+  '240810': '반도체와반도체장비',
+  '095660': '게임엔터테인먼트',
+  '112040': '게임엔터테인먼트',
+  '141080': '생물공학',
+  '214150': '건강관리장비와용품',
+  '066970': '화학',
+  '005290': '화학',
+  '042700': '반도체와반도체장비',
+  '393890': '반도체와반도체장비',
+  '007660': '전자장비와기기',
+  '064760': '소프트웨어',
+  '032190': '인터넷과카탈로그소매',
+  '025980': '게임엔터테인먼트',
+  '253450': '방송과엔터테인먼트',
+  '195940': '전자장비와기기',
+
+  // 미국 대형주 (US)
+  'NVDA': '반도체 / AI',
+  'AAPL': 'IT 하드웨어',
+  'MSFT': '소프트웨어 / 클라우드',
+  'GOOGL': '인터넷 / 검색',
+  'AMZN': '전자상거래 / 클라우드',
+  'META': '소셜미디어 / AI',
+  'BRK-B': '금융 / 복합기업',
+  'TSLA': '전기차 / 자율주행',
+  'AVGO': '반도체 / 통신',
+  'WMT': '유통 / 소매',
+  'JPM': '금융 / 투자은행',
+  'V': '결제 / 핀테크',
+  'UNH': '헬스케어',
+  'XOM': '에너지 / 석유',
+  'MA': '결제 / 핀테크',
+  'PG': '필수소비재',
+  'COST': '회원제 소매',
+  'HD': '인테리어 / 건자재',
+  'JNJ': '제약 / 헬스케어',
+  'ABBV': '바이오 / 제약'
+};
+
+function resolveStockSector(code, marketType) {
+  if (!code) return '';
+  if (KNOWN_SECTOR_MAP[code]) {
+    return KNOWN_SECTOR_MAP[code];
+  }
+  
+  if (marketType === 'KOSPI' || marketType === 'KOSDAK') {
+    try {
+      const url = `https://m.stock.naver.com/api/stock/${code}/integration`;
+      const res = UrlFetchApp.fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        muteHttpExceptions: true
+      });
+      if (res.getResponseCode() === 200) {
+        const json = JSON.parse(res.getContentText());
+        if (json.industryCode && NAVER_INDUSTRY_MAP[json.industryCode]) {
+          const sectorName = NAVER_INDUSTRY_MAP[json.industryCode];
+          KNOWN_SECTOR_MAP[code] = sectorName; // 캐싱
+          return sectorName;
+        }
+      }
+    } catch (e) {
+      Logger.log(`resolveStockSector error for ${code}: ` + e.toString());
+    }
+  }
+  return '';
+}
+
+// ============================================================================
 // 2. Web App 핸들러 & 설정 관리 API
 // ============================================================================
 
@@ -317,11 +475,13 @@ function getDefaultConfig() {
     ],
     telegramToken: '',
     telegramChatId: '',
-    krxPre: true,     // 08:55 NXT 장전 프리마켓 마감 알림
-    krxMain: true,    // 15:35 KRX/NXT 정규 메인마켓 마감 알림
-    krxAfter: true,   // 20:05 KRX/NXT 야간 통합 애프터마켓 마감 알림
-    krxNxt: true,     // 레거시 호환 필드
-    usMain: true,     // 05:05/06:05 미국 증시 마감 알림
+    enableKospi: true,   // 코스피 시장 분석 수신 여부
+    enableKosdak: true,  // 코스닥 시장 분석 수신 여부
+    krxPre: true,        // 08:55 NXT 장전 프리마켓 마감 알림
+    krxMain: true,       // 15:35 KRX/NXT 정규 메인마켓 마감 알림
+    krxAfter: true,      // 20:05 KRX/NXT 야간 통합 애프터마켓 마감 알림
+    krxNxt: true,        // 레거시 호환 필드
+    usMain: true,        // 05:05/06:05 미국 증시 마감 알림
     skipHolidays: true,
     topN: 20,
     compare1d: true,
@@ -331,6 +491,7 @@ function getDefaultConfig() {
     compare1y: false,
     showPastCap: false,
     showChangePercent: true,
+    showSector: true,    // 종목별 섹터(업종) 정보 표기
     showIcons: true,
     showLinks: true,
     includeAnalystSummary: true
@@ -346,6 +507,17 @@ function loadSettings() {
     }
     const saved = JSON.parse(jsonStr);
     const config = Object.assign(getDefaultConfig(), saved);
+    
+    // 코스피 / 코스닥 시장 분리 설정 마이그레이션 기본값 보장
+    if (config.enableKospi === undefined) {
+      config.enableKospi = true;
+    }
+    if (config.enableKosdak === undefined) {
+      config.enableKosdak = true;
+    }
+    if (config.showSector === undefined) {
+      config.showSector = true;
+    }
     
     // krxPre 기본값 보장 (신규 추가 필드 마이그레이션)
     if (config.krxPre === undefined) {
@@ -400,6 +572,9 @@ function saveSettings(config) {
     }
     
     config.topN = parseInt(config.topN, 10) || 20;
+    config.enableKospi = config.enableKospi !== false;
+    config.enableKosdak = config.enableKosdak !== false;
+    config.showSector = config.showSector !== false;
     config.krxPre = config.krxPre !== false;
     config.krxMain = config.krxMain !== false;
     config.krxAfter = config.krxAfter !== false;
@@ -489,21 +664,28 @@ function testTelegram(token, chatId, botName) {
 // 3. 리포트 미리보기 API (Preview Engine)
 // ============================================================================
 
-function previewReport(marketType) {
+function previewReport(marketType, subMarket) {
   try {
     const config = loadSettings();
     let data = [];
     let sessionTitle = '';
     
+    // 국내 세션일 경우 subMarket 결정 (지정되지 않았으면 사용자 활성 설정 기준 결정)
+    let domesticMarket = subMarket;
+    if (!domesticMarket || (domesticMarket !== 'KOSPI' && domesticMarket !== 'KOSDAK')) {
+      domesticMarket = config.enableKospi ? 'KOSPI' : (config.enableKosdak ? 'KOSDAK' : 'KOSPI');
+    }
+    const marketLabel = domesticMarket === 'KOSDAK' ? '코스닥(KOSDAK)' : '코스피(KOSPI)';
+    
     if (marketType === 'krxPre') {
-      sessionTitle = '[🌅 국내 장전 프리마켓 마감 시총 분석]';
-      data = fetchKrxMarketData(config.topN);
+      sessionTitle = `[🌅 국내 프리마켓 - ${marketLabel} 마감 시총 분석]`;
+      data = fetchKrxMarketData(domesticMarket, config.topN);
     } else if (marketType === 'krxMain') {
-      sessionTitle = '[📊 국내 정규장 마감 시총 분석]';
-      data = fetchKrxMarketData(config.topN);
+      sessionTitle = `[📊 국내 정규장 - ${marketLabel} 마감 시총 분석]`;
+      data = fetchKrxMarketData(domesticMarket, config.topN);
     } else if (marketType === 'krxAfter' || marketType === 'krxNxt') {
-      sessionTitle = '[🌙 국내 통합 애프터마켓 마감 시총 분석]';
-      data = fetchKrxMarketData(config.topN);
+      sessionTitle = `[🌙 국내 애프터마켓 - ${marketLabel} 마감 시총 분석]`;
+      data = fetchKrxMarketData(domesticMarket, config.topN);
     } else if (marketType === 'usMain') {
       sessionTitle = '[🇺🇸 미국 증시 마감 시총 분석]';
       data = fetchUsMarketData(config.topN);
@@ -517,6 +699,7 @@ function previewReport(marketType) {
     return {
       success: true,
       marketType: marketType,
+      subMarket: domesticMarket,
       sessionTitle: sessionTitle,
       htmlMessage: htmlMessage,
       stockCount: processed.length,
@@ -1178,51 +1361,63 @@ function dailyTriggerCheck() {
 // 5. 데이터 수집 Engine
 // ============================================================================
 
-function fetchKrxMarketData(topN) {
+function fetchKrxMarketData(marketType, topN) {
+  // 레거시 인자 호환 (첫 번째 인자가 숫자인 경우)
+  if (typeof marketType === 'number') {
+    topN = marketType;
+    marketType = 'ALL';
+  }
+  marketType = marketType || 'ALL';
+  topN = parseInt(topN, 10) || 20;
+
   try {
-    const kospiUrl = 'https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=1&pageSize=50';
-    const kosdakUrl = 'https://m.stock.naver.com/api/stocks/marketValue/KOSDAK?page=1&pageSize=50';
-    
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'application/json, text/plain, */*'
     };
     
-    const kospiRes = UrlFetchApp.fetch(kospiUrl, { headers: headers, muteHttpExceptions: true });
-    const kosdakRes = UrlFetchApp.fetch(kosdakUrl, { headers: headers, muteHttpExceptions: true });
-    
     let stocks = [];
+    const pageSize = Math.max(topN + 15, 35);
     
-    if (kospiRes.getResponseCode() === 200) {
-      const data = JSON.parse(kospiRes.getContentText());
-      const items = data.stocks || data;
-      if (Array.isArray(items)) {
-        items.forEach(item => stocks.push(parseNaverStockItem(item, 'KOSPI')));
+    if (marketType === 'KOSPI' || marketType === 'ALL') {
+      const kospiUrl = `https://m.stock.naver.com/api/stocks/marketValue/KOSPI?page=1&pageSize=${pageSize}`;
+      const kospiRes = UrlFetchApp.fetch(kospiUrl, { headers: headers, muteHttpExceptions: true });
+      if (kospiRes.getResponseCode() === 200) {
+        const data = JSON.parse(kospiRes.getContentText());
+        const items = data.stocks || data;
+        if (Array.isArray(items)) {
+          items.forEach(item => stocks.push(parseNaverStockItem(item, 'KOSPI')));
+        }
       }
     }
     
-    if (kosdakRes.getResponseCode() === 200) {
-      const data = JSON.parse(kosdakRes.getContentText());
-      const items = data.stocks || data;
-      if (Array.isArray(items)) {
-        items.forEach(item => stocks.push(parseNaverStockItem(item, 'KOSDAK')));
+    if (marketType === 'KOSDAK' || marketType === 'ALL') {
+      const kosdakUrl = `https://m.stock.naver.com/api/stocks/marketValue/KOSDAK?page=1&pageSize=${pageSize}`;
+      const kosdakRes = UrlFetchApp.fetch(kosdakUrl, { headers: headers, muteHttpExceptions: true });
+      if (kosdakRes.getResponseCode() === 200) {
+        const data = JSON.parse(kosdakRes.getContentText());
+        const items = data.stocks || data;
+        if (Array.isArray(items)) {
+          items.forEach(item => stocks.push(parseNaverStockItem(item, 'KOSDAK')));
+        }
       }
     }
     
     if (stocks.length === 0) {
-      stocks = getFallbackKrxData(topN);
+      stocks = getFallbackKrxData(topN, marketType);
     }
     
     stocks.sort((a, b) => b.marketCapRaw - a.marketCapRaw);
     const selected = stocks.slice(0, topN);
     selected.forEach((stock, idx) => {
       stock.currentRank = idx + 1;
+      stock.sector = resolveStockSector(stock.code, stock.market);
     });
     
     return selected;
   } catch (err) {
     Logger.log('fetchKrxMarketData Error: ' + err.toString());
-    return getFallbackKrxData(topN);
+    return getFallbackKrxData(topN, marketType);
   }
 }
 
@@ -1263,6 +1458,7 @@ function parseNaverStockItem(item, marketType) {
     changeRate: changeRate,
     marketCapRaw: capRaw,
     marketCapFormatted: formattedCap,
+    sector: resolveStockSector(code, marketType),
     link: `https://finance.naver.com/item/main.naver?code=${code}`
   };
 }
@@ -1323,6 +1519,7 @@ function fetchUsMarketData(topN) {
           changeRate: changeRate,
           marketCapRaw: marketCap,
           marketCapFormatted: formatCapUsd(marketCap),
+          sector: resolveStockSector(q.symbol, 'US'),
           link: `https://www.google.com/finance/quote/${googleTicker}:${info.exchange}`
         });
       });
@@ -1336,6 +1533,9 @@ function fetchUsMarketData(topN) {
     const selected = stocks.slice(0, topN);
     selected.forEach((stock, idx) => {
       stock.currentRank = idx + 1;
+      if (!stock.sector) {
+        stock.sector = resolveStockSector(stock.code, 'US');
+      }
     });
     
     return selected;
@@ -1452,7 +1652,8 @@ function generateReportHtml(sessionTitle, stockList, config) {
     } else {
       titleLine += `<b>${escapeHtml(stock.name)}</b>`;
     }
-    titleLine += ` <code>(${stock.market})</code>\n`;
+    const sectorPart = (config.showSector && stock.sector) ? ` · ${escapeHtml(stock.sector)}` : '';
+    titleLine += ` <code>(${stock.market}${sectorPart})</code>\n`;
     html += titleLine;
     
     const changeSymbol = stock.changeRate > 0 ? '🔺' : stock.changeRate < 0 ? '🔻' : '➖';
@@ -1548,13 +1749,16 @@ function generateAnalystSummary(stockList, sessionTitle, config) {
     const jumpComp = (topRankJump.comparisons && topRankJump.comparisons[periodKey]) ? topRankJump.comparisons[periodKey] : { rankShift: 0, returnRate: 0, icon: '' };
     const dropComp = (topRankDrop.comparisons && topRankDrop.comparisons[periodKey]) ? topRankDrop.comparisons[periodKey] : { rankShift: 0, returnRate: 0, icon: '' };
 
+    const jumpSector = (config.showSector && topRankJump.sector) ? ` [${topRankJump.sector}]` : '';
+    const dropSector = (config.showSector && topRankDrop.sector) ? ` [${topRankDrop.sector}]` : '';
+
     summaryText += `<b>■ ${periodName} 대비 순위 변동 요약:</b>\n`;
     
     if (jumpComp.rankShift > 0) {
       let iconStr = jumpComp.icon ? (jumpComp.icon + ' ') : '';
       const rateSign = jumpComp.returnRate > 0 ? '+' : '';
       let capStr = config.showPastCap ? ` / ${jumpComp.pastCapFormatted}` : '';
-      summaryText += `  • <b>최대 순위 급등:</b> ${topRankJump.name} ${iconStr}(▲${jumpComp.rankShift}계단 / ${rateSign}${jumpComp.returnRate.toFixed(1)}%${capStr})\n`;
+      summaryText += `  • <b>최대 순위 급등:</b> ${topRankJump.name}${jumpSector} ${iconStr}(▲${jumpComp.rankShift}계단 / ${rateSign}${jumpComp.returnRate.toFixed(1)}%${capStr})\n`;
     } else {
       summaryText += `  • <b>최대 순위 급등:</b> (순위 유지 - 상위 독점주)\n`;
     }
@@ -1563,7 +1767,7 @@ function generateAnalystSummary(stockList, sessionTitle, config) {
       let iconStr = dropComp.icon ? (dropComp.icon + ' ') : '';
       const rateSign = dropComp.returnRate > 0 ? '+' : '';
       let capStr = config.showPastCap ? ` / ${dropComp.pastCapFormatted}` : '';
-      summaryText += `  • <b>최대 순위 급락:</b> ${topRankDrop.name} ${iconStr}(▼${Math.abs(dropComp.rankShift)}계단 / ${rateSign}${dropComp.returnRate.toFixed(1)}%${capStr})\n`;
+      summaryText += `  • <b>최대 순위 급락:</b> ${topRankDrop.name}${dropSector} ${iconStr}(▼${Math.abs(dropComp.rankShift)}계단 / ${rateSign}${dropComp.returnRate.toFixed(1)}%${capStr})\n`;
     } else {
       summaryText += `  • <b>최대 순위 급락:</b> (하락 종목 없음)\n`;
     }
@@ -1574,7 +1778,8 @@ function generateAnalystSummary(stockList, sessionTitle, config) {
       const jumpNames = otherJumps.slice(0, 3).map(s => {
         const c = s.comparisons[periodKey];
         const ic = c.icon ? (c.icon + ' ') : '';
-        return `${s.name}(${ic}▲${c.rankShift}계단)`;
+        const sec = (config.showSector && s.sector) ? `·${s.sector}` : '';
+        return `${s.name}${sec ? '(' + sec + ')' : ''}(${ic}▲${c.rankShift}계단)`;
       }).join(', ');
       summaryText += `  • <b>주요 순위 상승:</b> ${jumpNames}\n`;
     }
@@ -1585,7 +1790,8 @@ function generateAnalystSummary(stockList, sessionTitle, config) {
       const dropNames = otherDrops.slice(0, 3).map(s => {
         const c = s.comparisons[periodKey];
         const ic = c.icon ? (c.icon + ' ') : '';
-        return `${s.name}(${ic}▼${Math.abs(c.rankShift)}계단)`;
+        const sec = (config.showSector && s.sector) ? `·${s.sector}` : '';
+        return `${s.name}${sec ? '(' + sec + ')' : ''}(${ic}▼${Math.abs(c.rankShift)}계단)`;
       }).join(', ');
       summaryText += `  • <b>주요 순위 하락:</b> ${dropNames}\n`;
     }
@@ -1728,61 +1934,58 @@ function splitHtmlMessage(text, maxLength) {
   return chunks;
 }
 
-function sendKrxPreReport() {
+function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isManual) {
   const config = loadSettings();
   
   // 휴장일 자동 발송 제외 체크
-  if (config.skipHolidays) {
+  if (!isManual && config.skipHolidays) {
     const check = isKrxHoliday(new Date());
     if (check.isHoliday) {
-      const skipLog = `[발송 제외] 오늘은 국내 증시 휴장일(${check.reason})이므로 장전 프리마켓 리포트 발송을 건너뜁니다.`;
+      const skipLog = `[발송 제외] 오늘은 국내 증시 휴장일(${check.reason})이므로 ${sessionLabel} 리포트 발송을 건너뜁니다.`;
       Logger.log(skipLog);
       return { success: true, skipped: true, message: skipLog };
     }
   }
 
-  const data = fetchKrxMarketData(config.topN);
-  const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[🌅 국내 장전 프리마켓 마감 시총 분석]', processed, config);
-  return sendTelegramMessage(config, html);
+  const results = [];
+  
+  // 1. 코스피 리포트 발송 (활성화된 경우)
+  if (config.enableKospi) {
+    const dataKospi = fetchKrxMarketData('KOSPI', config.topN);
+    const processedKospi = calculateHistoricalChanges(dataKospi, config);
+    const titleKospi = `[${sessionEmoji} 국내 ${sessionLabel} - 코스피(KOSPI) 마감 시총 분석]`;
+    const htmlKospi = generateReportHtml(titleKospi, processedKospi, config);
+    results.push(sendTelegramMessage(config, htmlKospi));
+  }
+  
+  // 2. 코스닥 리포트 발송 (활성화된 경우)
+  if (config.enableKosdak) {
+    const dataKosdak = fetchKrxMarketData('KOSDAK', config.topN);
+    const processedKosdak = calculateHistoricalChanges(dataKosdak, config);
+    const titleKosdak = `[${sessionEmoji} 국내 ${sessionLabel} - 코스닥(KOSDAK) 마감 시총 분석]`;
+    const htmlKosdak = generateReportHtml(titleKosdak, processedKosdak, config);
+    results.push(sendTelegramMessage(config, htmlKosdak));
+  }
+  
+  if (results.length === 0) {
+    const msg = `[발송 제외] 코스피/코스닥 수신 설정이 모두 비활성화되어 있어 ${sessionLabel} 리포트를 발송하지 않았습니다.`;
+    Logger.log(msg);
+    return { success: true, skipped: true, message: msg };
+  }
+  
+  return { success: true, message: `${sessionLabel} 리포트 발송 완료 (${results.length}개 시장)` };
+}
+
+function sendKrxPreReport() {
+  return sendDomesticMarketSession('krxPre', '🌅', '프리마켓', false);
 }
 
 function sendKrxMainReport() {
-  const config = loadSettings();
-  
-  // 휴장일 자동 발송 제외 체크
-  if (config.skipHolidays) {
-    const check = isKrxHoliday(new Date());
-    if (check.isHoliday) {
-      const skipLog = `[발송 제외] 오늘은 국내 증시 휴장일(${check.reason})이므로 정규장 마감 리포트 발송을 건너뜁니다.`;
-      Logger.log(skipLog);
-      return { success: true, skipped: true, message: skipLog };
-    }
-  }
-
-  const data = fetchKrxMarketData(config.topN);
-  const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[📊 국내 정규장 마감 시총 분석]', processed, config);
-  return sendTelegramMessage(config, html);
+  return sendDomesticMarketSession('krxMain', '📊', '정규장', false);
 }
 
 function sendKrxAfterReport() {
-  const config = loadSettings();
-  
-  // 휴장일 자동 발송 제외 체크
-  if (config.skipHolidays) {
-    const check = isKrxHoliday(new Date());
-    if (check.isHoliday) {
-      const skipLog = `[발송 제외] 오늘은 국내 증시 휴장일(${check.reason})이므로 애프터마켓 마감 리포트 발송을 건너뜁니다.`;
-      Logger.log(skipLog);
-      return { success: true, skipped: true, message: skipLog };
-    }
-  }
-
-  const data = fetchKrxMarketData(config.topN);
-  const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[🌙 국내 통합 애프터마켓 마감 시총 분석]', processed, config);
-  return sendTelegramMessage(config, html);
+  return sendDomesticMarketSession('krxAfter', '🌙', '애프터마켓', false);
 }
 
 // 레거시 호환성 유지
@@ -1811,27 +2014,15 @@ function sendUsReport() {
 
 // 수동 즉시 발송 함수 (대시보드 UI 테스트용 - 휴장일이라도 강제 전송)
 function sendManualKrxPreReport() {
-  const config = loadSettings();
-  const data = fetchKrxMarketData(config.topN);
-  const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[🌅 국내 장전 프리마켓 마감 시총 분석]', processed, config);
-  return sendTelegramMessage(config, html);
+  return sendDomesticMarketSession('krxPre', '🌅', '프리마켓', true);
 }
 
 function sendManualKrxMainReport() {
-  const config = loadSettings();
-  const data = fetchKrxMarketData(config.topN);
-  const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[📊 국내 정규장 마감 시총 분석]', processed, config);
-  return sendTelegramMessage(config, html);
+  return sendDomesticMarketSession('krxMain', '📊', '정규장', true);
 }
 
 function sendManualKrxAfterReport() {
-  const config = loadSettings();
-  const data = fetchKrxMarketData(config.topN);
-  const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[🌙 국내 통합 애프터마켓 마감 시총 분석]', processed, config);
-  return sendTelegramMessage(config, html);
+  return sendDomesticMarketSession('krxAfter', '🌙', '애프터마켓', true);
 }
 
 function sendManualKrxNxtReport() {
@@ -1893,39 +2084,56 @@ function getHash(str) {
   return Math.abs(hash);
 }
 
-function getFallbackKrxData(topN) {
-  const fallback = [
-    { code: '005930', name: '삼성전자', market: 'KOSPI', price: 274500, changeRate: 2.43, marketCapRaw: 16048035, marketCapFormatted: '1,604조 8,035억원', link: 'https://finance.naver.com/item/main.naver?code=005930' },
-    { code: '000660', name: 'SK하이닉스', market: 'KOSPI', price: 1645000, changeRate: 3.26, marketCapRaw: 12016599, marketCapFormatted: '1,201조 6,599억원', link: 'https://finance.naver.com/item/main.naver?code=000660' },
-    { code: '005935', name: '삼성전자우', market: 'KOSPI', price: 195600, changeRate: 4.15, marketCapRaw: 1569438, marketCapFormatted: '156조 9,438억원', link: 'https://finance.naver.com/item/main.naver?code=005935' },
-    { code: '402340', name: 'SK스퀘어', market: 'KOSPI', price: 1154000, changeRate: 3.31, marketCapRaw: 1522800, marketCapFormatted: '152조 2,800억원', link: 'https://finance.naver.com/item/main.naver?code=402340' },
-    { code: '009150', name: '삼성전기', market: 'KOSPI', price: 1558000, changeRate: 3.66, marketCapRaw: 1163728, marketCapFormatted: '116조 3,728억원', link: 'https://finance.naver.com/item/main.naver?code=009150' },
-    { code: '005380', name: '현대차', market: 'KOSPI', price: 245000, changeRate: 8.24, marketCapRaw: 927553, marketCapFormatted: '92조 7,553억원', link: 'https://finance.naver.com/item/main.naver?code=005380' },
-    { code: '373220', name: 'LG에너지솔루션', market: 'KOSPI', price: 345000, changeRate: 1.09, marketCapRaw: 864630, marketCapFormatted: '86조 4,630억원', link: 'https://finance.naver.com/item/main.naver?code=373220' },
-    { code: '207940', name: '삼성바이오로직스', market: 'KOSPI', price: 980000, changeRate: -1.02, marketCapRaw: 716584, marketCapFormatted: '71조 6,584억원', link: 'https://finance.naver.com/item/main.naver?code=207940' },
-    { code: '032830', name: '삼성생명', market: 'KOSPI', price: 301000, changeRate: 3.26, marketCapRaw: 602000, marketCapFormatted: '60조 2,000억원', link: 'https://finance.naver.com/item/main.naver?code=032830' },
-    { code: '028260', name: '삼성물산', market: 'KOSPI', price: 369000, changeRate: 1.10, marketCapRaw: 598398, marketCapFormatted: '59조 8,398억원', link: 'https://finance.naver.com/item/main.naver?code=028260' },
-    { code: '012450', name: '한화에어로스페이스', market: 'KOSPI', price: 1160000, changeRate: -2.11, marketCapRaw: 598135, marketCapFormatted: '59조 8,135억원', link: 'https://finance.naver.com/item/main.naver?code=012450' },
-    { code: '105560', name: 'KB금융', market: 'KOSPI', price: 168500, changeRate: 0.24, marketCapRaw: 597649, marketCapFormatted: '59조 7,649억원', link: 'https://finance.naver.com/item/main.naver?code=105560' },
-    { code: '000270', name: '기아', market: 'KOSPI', price: 141700, changeRate: 3.13, marketCapRaw: 553215, marketCapFormatted: '55조 3,215억원', link: 'https://finance.naver.com/item/main.naver?code=000270' },
-    { code: '329180', name: 'HD현대중공업', market: 'KOSPI', price: 510000, changeRate: 2.82, marketCapRaw: 535302, marketCapFormatted: '53조 5,302억원', link: 'https://finance.naver.com/item/main.naver?code=329180' },
-    { code: '034020', name: '두산에너빌리티', market: 'KOSPI', price: 82600, changeRate: 2.10, marketCapRaw: 529104, marketCapFormatted: '52조 9,104억원', link: 'https://finance.naver.com/item/main.naver?code=034020' },
-    { code: '055550', name: '신한지주', market: 'KOSPI', price: 107400, changeRate: 0.75, marketCapRaw: 504190, marketCapFormatted: '50조 4,190억원', link: 'https://finance.naver.com/item/main.naver?code=055550' },
-    { code: '012330', name: '현대모비스', market: 'KOSPI', price: 547000, changeRate: 7.05, marketCapRaw: 496307, marketCapFormatted: '49조 6,307억원', link: 'https://finance.naver.com/item/main.naver?code=012330' },
-    { code: '068270', name: '셀트리온', market: 'KOSPI', price: 201000, changeRate: -0.50, marketCapRaw: 467561, marketCapFormatted: '46조 7,561억원', link: 'https://finance.naver.com/item/main.naver?code=068270' },
-    { code: '034730', name: 'SK', market: 'KOSPI', price: 585000, changeRate: 5.79, marketCapRaw: 424141, marketCapFormatted: '42조 4,141억원', link: 'https://finance.naver.com/item/main.naver?code=034730' },
-    { code: '006400', name: '삼성SDI', market: 'KOSPI', price: 516000, changeRate: 5.95, marketCapRaw: 415821, marketCapFormatted: '41조 5,821억원', link: 'https://finance.naver.com/item/main.naver?code=006400' }
+function getFallbackKrxData(topN, marketType) {
+  const kospiFallback = [
+    { code: '005930', name: '삼성전자', market: 'KOSPI', price: 274500, changeRate: 2.43, marketCapRaw: 16048035, marketCapFormatted: '1,604조 8,035억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=005930' },
+    { code: '000660', name: 'SK하이닉스', market: 'KOSPI', price: 1645000, changeRate: 3.26, marketCapRaw: 12016599, marketCapFormatted: '1,201조 6,599억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=000660' },
+    { code: '005935', name: '삼성전자우', market: 'KOSPI', price: 195600, changeRate: 4.15, marketCapRaw: 1569438, marketCapFormatted: '156조 9,438억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=005935' },
+    { code: '402340', name: 'SK스퀘어', market: 'KOSPI', price: 1154000, changeRate: 3.31, marketCapRaw: 1522800, marketCapFormatted: '152조 2,800억원', sector: '창업투자', link: 'https://finance.naver.com/item/main.naver?code=402340' },
+    { code: '009150', name: '삼성전기', market: 'KOSPI', price: 1558000, changeRate: 3.66, marketCapRaw: 1163728, marketCapFormatted: '116조 3,728억원', sector: '전자장비와기기', link: 'https://finance.naver.com/item/main.naver?code=009150' },
+    { code: '005380', name: '현대차', market: 'KOSPI', price: 245000, changeRate: 8.24, marketCapRaw: 927553, marketCapFormatted: '92조 7,553억원', sector: '자동차', link: 'https://finance.naver.com/item/main.naver?code=005380' },
+    { code: '373220', name: 'LG에너지솔루션', market: 'KOSPI', price: 345000, changeRate: 1.09, marketCapRaw: 864630, marketCapFormatted: '86조 4,630억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=373220' },
+    { code: '207940', name: '삼성바이오로직스', market: 'KOSPI', price: 980000, changeRate: -1.02, marketCapRaw: 716584, marketCapFormatted: '71조 6,584억원', sector: '제약', link: 'https://finance.naver.com/item/main.naver?code=207940' },
+    { code: '032830', name: '삼성생명', market: 'KOSPI', price: 301000, changeRate: 3.26, marketCapRaw: 602000, marketCapFormatted: '60조 2,000억원', sector: '생명보험', link: 'https://finance.naver.com/item/main.naver?code=032830' },
+    { code: '028260', name: '삼성물산', market: 'KOSPI', price: 369000, changeRate: 1.10, marketCapRaw: 598398, marketCapFormatted: '59조 8,398억원', sector: '복합기업', link: 'https://finance.naver.com/item/main.naver?code=028260' },
+    { code: '012450', name: '한화에어로스페이스', market: 'KOSPI', price: 1160000, changeRate: -2.11, marketCapRaw: 598135, marketCapFormatted: '59조 8,135억원', sector: '우주항공과국방', link: 'https://finance.naver.com/item/main.naver?code=012450' },
+    { code: '105560', name: 'KB금융', market: 'KOSPI', price: 168500, changeRate: 0.24, marketCapRaw: 597649, marketCapFormatted: '59조 7,649억원', sector: '은행', link: 'https://finance.naver.com/item/main.naver?code=105560' },
+    { code: '000270', name: '기아', market: 'KOSPI', price: 141700, changeRate: 3.13, marketCapRaw: 553215, marketCapFormatted: '55조 3,215억원', sector: '자동차', link: 'https://finance.naver.com/item/main.naver?code=000270' },
+    { code: '329180', name: 'HD현대중공업', market: 'KOSPI', price: 510000, changeRate: 2.82, marketCapRaw: 535302, marketCapFormatted: '53조 5,302억원', sector: '조선', link: 'https://finance.naver.com/item/main.naver?code=329180' },
+    { code: '034020', name: '두산에너빌리티', market: 'KOSPI', price: 82600, changeRate: 2.10, marketCapRaw: 529104, marketCapFormatted: '52조 9,104억원', sector: '기계', link: 'https://finance.naver.com/item/main.naver?code=034020' },
+    { code: '055550', name: '신한지주', market: 'KOSPI', price: 107400, changeRate: 0.75, marketCapRaw: 504190, marketCapFormatted: '50조 4,190억원', sector: '은행', link: 'https://finance.naver.com/item/main.naver?code=055550' },
+    { code: '012330', name: '현대모비스', market: 'KOSPI', price: 547000, changeRate: 7.05, marketCapRaw: 496307, marketCapFormatted: '49조 6,307억원', sector: '자동차부품', link: 'https://finance.naver.com/item/main.naver?code=012330' },
+    { code: '068270', name: '셀트리온', market: 'KOSPI', price: 201000, changeRate: -0.50, marketCapRaw: 467561, marketCapFormatted: '46조 7,561억원', sector: '제약', link: 'https://finance.naver.com/item/main.naver?code=068270' },
+    { code: '034730', name: 'SK', market: 'KOSPI', price: 585000, changeRate: 5.79, marketCapRaw: 424141, marketCapFormatted: '42조 4,141억원', sector: '복합기업', link: 'https://finance.naver.com/item/main.naver?code=034730' },
+    { code: '006400', name: '삼성SDI', market: 'KOSPI', price: 516000, changeRate: 5.95, marketCapRaw: 415821, marketCapFormatted: '41조 5,821억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=006400' }
   ];
-  return fallback.slice(0, topN);
+
+  const kosdakFallback = [
+    { code: '196170', name: '알테오젠', market: 'KOSDAK', price: 425000, changeRate: 3.41, marketCapRaw: 226815, marketCapFormatted: '22조 6,815억원', sector: '생물공학', link: 'https://finance.naver.com/item/main.naver?code=196170' },
+    { code: '247540', name: '에코프로비엠', market: 'KOSDAK', price: 168000, changeRate: 1.82, marketCapRaw: 164280, marketCapFormatted: '16조 4,280억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=247540' },
+    { code: '086520', name: '에코프로', market: 'KOSDAK', price: 78500, changeRate: 2.21, marketCapRaw: 104520, marketCapFormatted: '10조 4,520억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=086520' },
+    { code: '028300', name: 'HLB', market: 'KOSDAK', price: 74200, changeRate: -0.80, marketCapRaw: 97150, marketCapFormatted: '9조 7,150억원', sector: '제약/생물공학', link: 'https://finance.naver.com/item/main.naver?code=028300' },
+    { code: '277810', name: '레인보우로보틱스', market: 'KOSDAK', price: 142000, changeRate: 4.10, marketCapRaw: 27420, marketCapFormatted: '2조 7,420억원', sector: '기계', link: 'https://finance.naver.com/item/main.naver?code=277810' },
+    { code: '058470', name: '리노공업', market: 'KOSDAK', price: 198000, changeRate: 1.54, marketCapRaw: 30180, marketCapFormatted: '3조 180억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=058470' },
+    { code: '403870', name: 'HPSP', market: 'KOSDAK', price: 34500, changeRate: 2.68, marketCapRaw: 28940, marketCapFormatted: '2조 8,940억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=403870' },
+    { code: '145020', name: '휴젤', market: 'KOSDAK', price: 285000, changeRate: 1.06, marketCapRaw: 35120, marketCapFormatted: '3조 5,120억원', sector: '제약', link: 'https://finance.naver.com/item/main.naver?code=145020' },
+    { code: '214150', name: '클래시스', market: 'KOSDAK', price: 54200, changeRate: 0.93, marketCapRaw: 35200, marketCapFormatted: '3조 5,200억원', sector: '건강관리장비와용품', link: 'https://finance.naver.com/item/main.naver?code=214150' },
+    { code: '035900', name: 'JYP Ent.', market: 'KOSDAK', price: 62000, changeRate: -1.27, marketCapRaw: 22010, marketCapFormatted: '2조 2,010억원', sector: '방송과엔터테인먼트', link: 'https://finance.naver.com/item/main.naver?code=035900' }
+  ];
+
+  if (marketType === 'KOSDAK') {
+    return kosdakFallback.slice(0, topN);
+  }
+  return kospiFallback.slice(0, topN);
 }
 
 function getFallbackUsData(topN, tickers) {
   const mockMap = [
-    { code: 'NVDA', name: 'NVIDIA', market: 'NASDAQ', price: 128.50, changeRate: 4.15, marketCapRaw: 3150000000000, marketCapFormatted: '$3.15T', link: 'https://www.google.com/finance/quote/NVDA:NASDAQ' },
-    { code: 'AAPL', name: 'Apple', market: 'NASDAQ', price: 224.20, changeRate: 1.10, marketCapRaw: 3420000000000, marketCapFormatted: '$3.42T', link: 'https://www.google.com/finance/quote/AAPL:NASDAQ' },
-    { code: 'MSFT', name: 'Microsoft', market: 'NASDAQ', price: 448.90, changeRate: 0.85, marketCapRaw: 3330000000000, marketCapFormatted: '$3.33T', link: 'https://www.google.com/finance/quote/MSFT:NASDAQ' },
-    { code: 'GOOGL', name: 'Alphabet A', market: 'NASDAQ', price: 182.30, changeRate: -0.45, marketCapRaw: 2260000000000, marketCapFormatted: '$2.26T', link: 'https://www.google.com/finance/quote/GOOGL:NASDAQ' },
-    { code: 'AMZN', name: 'Amazon', market: 'NASDAQ', price: 186.50, changeRate: 1.65, marketCapRaw: 1940000000000, marketCapFormatted: '$1.94T', link: 'https://www.google.com/finance/quote/AMZN:NASDAQ' }
+    { code: 'NVDA', name: 'NVIDIA', market: 'NASDAQ', price: 128.50, changeRate: 4.15, marketCapRaw: 3150000000000, marketCapFormatted: '$3.15T', sector: '반도체 / AI', link: 'https://www.google.com/finance/quote/NVDA:NASDAQ' },
+    { code: 'AAPL', name: 'Apple', market: 'NASDAQ', price: 224.20, changeRate: 1.10, marketCapRaw: 3420000000000, marketCapFormatted: '$3.42T', sector: 'IT 하드웨어', link: 'https://www.google.com/finance/quote/AAPL:NASDAQ' },
+    { code: 'MSFT', name: 'Microsoft', market: 'NASDAQ', price: 448.90, changeRate: 0.85, marketCapRaw: 3330000000000, marketCapFormatted: '$3.33T', sector: '소프트웨어 / 클라우드', link: 'https://www.google.com/finance/quote/MSFT:NASDAQ' },
+    { code: 'GOOGL', name: 'Alphabet A', market: 'NASDAQ', price: 182.30, changeRate: -0.45, marketCapRaw: 2260000000000, marketCapFormatted: '$2.26T', sector: '인터넷 / 검색', link: 'https://www.google.com/finance/quote/GOOGL:NASDAQ' },
+    { code: 'AMZN', name: 'Amazon', market: 'NASDAQ', price: 186.50, changeRate: 1.65, marketCapRaw: 1940000000000, marketCapFormatted: '$1.94T', sector: '전자상거래 / 클라우드', link: 'https://www.google.com/finance/quote/AMZN:NASDAQ' }
   ];
   return mockMap.slice(0, topN);
 }

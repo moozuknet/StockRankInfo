@@ -80,7 +80,23 @@ npx clasp deployments</code></pre>
     <li><b>거래 대상 및 제외 종목:</b> 변동성 관리를 위해 <b>ETF(상장지수펀드) 및 ETN(상장지수증권)</b>은 현재 양대 거래소 모두 애프터마켓 거래 대상에서 제외됩니다.</li>
   </ul>
 
-  <h2>3. 📊 시간대별 4대 Market Data Engine 파이프라인 (`Code.gs`)</h2>
+  <h2>3. 📊 시간대별 Market Data Engine 및 KOSPI / KOSDAK · 섹터 파이프라인 (`Code.gs`)</h2>
+  <p>국내 증시 분석 시 <b>코스피(KOSPI)와 코스닥(KOSDAK)을 명확히 분리하여 각각 분석</b>하며, <b>종목별 WICS 표준 섹터(업종) 정보</b>를 결합하여 수급과 모멘텀을 정밀 분석합니다.</p>
+
+  <h3>1) 코스피 &amp; 코스닥 분리 수집 및 독립 설정</h3>
+  <ul>
+    <li><b>수신 설정 필드:</b> <code>enableKospi</code>(기본값 true), <code>enableKosdak</code>(기본값 true). 원하는 시장만 단독 선택하거나 양대 시장 모두 수신 가능.</li>
+    <li><b>독립 Top N 산출:</b> KOSPI 상위 N개, KOSDAK 상위 N개를 각각 독립 산출하여 코스닥 핵심 주도주(바이오, 2차전지, 로봇 등) 누락 방지.</li>
+    <li><b>독립 메시지 발송:</b> 각 시장별 리포트를 순차 발송하여 텔레그램 4,096자 제한 방지 및 가독성 확보.</li>
+  </ul>
+
+  <h3>2) 종목별 섹터(업종) 정보 파이프라인</h3>
+  <ul>
+    <li><b>WICS 79개 표준 업종:</b> 네이버 증권 WICS 코드 체계(<code>NAVER_INDUSTRY_MAP</code>) 연동.</li>
+    <li><b>2계층 하이브리드 엔진:</b> 대형주 팩트 섹터 캐시(Layer 1, 0ms) + 실시간 <code>industryCode</code> 동적 조회(Layer 2).</li>
+    <li><b>리포트 표기 서식:</b> <code>#1 종목명 (시장 · 섹터)</code> (설정 <code>showSector</code> 지원).</li>
+  </ul>
+
   <table>
     <thead>
       <tr>
@@ -94,26 +110,26 @@ npx clasp deployments</code></pre>
       <tr>
         <td><b>평일 08:55</b></td>
         <td><code>sendKrxPreReport</code></td>
-        <td><code>[🌅 국내 장전 프리마켓 마감 시총 분석]</code></td>
-        <td>NXT 프리마켓(08:00~08:50) 체결 마감 직후 장전 수급 및 당일 개장 준비 시총/변동 분석</td>
+        <td><code>[🌅 국내 프리마켓 - 코스피/코스닥 마감 시총 분석]</code></td>
+        <td>NXT 프리마켓(08:00~08:50) 체결 마감 직후 시장별 장전 수급 및 당일 개장 준비 시총/섹터 변동 분석</td>
       </tr>
       <tr>
         <td><b>평일 15:35</b></td>
         <td><code>sendKrxMainReport</code></td>
-        <td><code>[📊 국내 정규장 마감 시총 분석]</code></td>
-        <td>KRX(15:30) 및 NXT(15:20) 정규 메인마켓 종가 확정 후 당일 시총 랭킹 및 순위 변동 분석</td>
+        <td><code>[📊 국내 정규장 - 코스피/코스닥 마감 시총 분석]</code></td>
+        <td>KRX(15:30) 및 NXT(15:20) 정규 메인마켓 종가 확정 후 시장별 시총 랭킹, 섹터 동향 및 순위 변동 분석</td>
       </tr>
       <tr>
         <td><b>평일 20:05</b></td>
         <td><code>sendKrxAfterReport</code></td>
-        <td><code>[🌙 국내 통합 애프터마켓 마감 시총 분석]</code></td>
-        <td>20:00 KRX &amp; NXT 애프터마켓 완전 마감 직후 실시간 접속매매 반영 최종 시총 및 변동 분석</td>
+        <td><code>[🌙 국내 애프터마켓 - 코스피/코스닥 마감 시총 분석]</code></td>
+        <td>20:00 KRX &amp; NXT 애프터마켓 완전 마감 직후 실시간 접속매매 반영 최종 시장별 시총 및 섹터 변동 분석</td>
       </tr>
       <tr>
         <td><b>화~토 05:05/06:05</b></td>
         <td><code>sendUsReport</code></td>
         <td><code>[🇺🇸 미국 증시 마감 시총 분석]</code></td>
-        <td>미국 본장(16:00 EDT/EST) 마감 후 엔비디아/빅테크 중심 글로벌 시총 변동 분석</td>
+        <td>미국 본장(16:00 EDT/EST) 마감 후 엔비디아/빅테크 중심 글로벌 시총 변동 및 테크 섹터 분석</td>
       </tr>
     </tbody>
   </table>

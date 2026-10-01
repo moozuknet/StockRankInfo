@@ -1,2 +1,4 @@
-.git/**
-node_modules/**
+**/**
+!appsscript.json
+!Code.gs
+!Index.html
