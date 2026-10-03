@@ -216,14 +216,32 @@ flowchart TD
 
 ---
 
-## 6. 🔒 보안 및 깃허브(GitHub) 동기화 정책
+## 6. 🔒 배포 및 깃허브(GitHub) 동기화 전 필수 절차
 
-1. **배포 URL 및 인증 토큰 비공개 정책**:
-   - `README.md` 및 `DEVELOPMENT_GUIDE.md` 등 공개 문서에는 개인 배포 Exec URL 및 Bot Token을 직접 기재하지 않습니다.
-   - 문서에 사용되는 스크린샷 에셋은 Bot Token 및 Chat ID 입력창이 빈값/플레이스홀더로 마스킹된 캡처본(`assets/dashboard_preview.png`)을 사용합니다.
-2. **GitHub 저장소 푸시**:
+### 1) 📸 README 문서용 프로그램 최신 스크린샷 갱신 (필수 선행 작업)
+- **원칙**: GAS 배포 및 GitHub 푸시 전, UI 변경사항(신규 옵션, 서식, 헤더 버전 등)이 온전히 반영된 최신 대시보드 화면을 캡처하여 `assets/dashboard_preview.png`를 반드시 최신화해야 합니다.
+- **보안 준수**: 토큰 및 개인 Chat ID는 반드시 마스킹 처리된 상태(플레이스홀더)로 캡처합니다.
+- **자동 캡처 실행 명령 (Chrome Headless)**:
+  ```powershell
+  Start-Process -FilePath "C:\Program Files\Google\Chrome\Application\chrome.exe" -ArgumentList '--headless --disable-gpu --no-sandbox --screenshot=C:\dev\Antigravity\StockRankInfo\assets\dashboard_preview.png --window-size=1280,1850 file:///C:/dev/Antigravity/StockRankInfo/Index.html' -Wait
+  ```
+
+### 2) 🚀 Google Apps Script (GAS) 온라인 배포
+- clasp CLI를 통해 최신 코드를 푸시하고 프로덕션 배포 버전을 생성합니다.
+  ```bash
+  # 1. 파일 푸시 (.claspignore 자동 적용)
+  npx clasp push --force
+
+  # 2. 프로덕션 배포 갱신
+  npx clasp deploy -i <DEPLOYMENT_ID> -d "vX.X.X Release - 변경사항 요약"
+  ```
+
+### 3) 🔒 보안 및 깃허브(GitHub) 동기화
+1. **인증 토큰 및 개인 URL 비공개 정책**:
+   - `README.md`, `DEVELOPMENT_GUIDE.md` 등 공개 문서에는 개인 배포 Exec URL 및 Bot Token을 직접 기재하지 않습니다.
+2. **최종 Git 커밋 및 GitHub 푸시**:
    ```bash
-   git add .
-   git commit -m "v2.0 Release - Updated KRX/NXT Market Hours & Documentation"
+   git add -A
+   git commit -m "feat/docs: 배포 및 최신 스크린샷 갱신 (vX.X.X)"
    git push origin main
    ```

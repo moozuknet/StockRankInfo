@@ -569,6 +569,62 @@
 
   <!-- JavaScript Application Logic -->
   <script>
+    // 로컬 브라우저 렌더링 및 스크린샷 캡처용 google.script.run Fallback Mock
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      window.google = {
+        script: {
+          run: {
+            withSuccessHandler: function(cb) {
+              const runner = Object.create(this);
+              runner._success = cb;
+              return runner;
+            },
+            withFailureHandler: function(cb) {
+              const runner = Object.create(this);
+              runner._failure = cb;
+              return runner;
+            },
+            loadSettings: function() {
+              const data = {
+                telegramBots: [{ id: 'bot_1', name: '알림 봇 (운영)', token: '•••••••••••••••••••••••••', chatId: '••••••••••', enabled: true }],
+                enableKospi: true,
+                enableKosdak: true,
+                showSector: true,
+                showHighDiff: true,
+                krxPre: true,
+                krxMain: true,
+                krxAfter: true,
+                usMain: true,
+                skipHolidays: true,
+                topN: 20,
+                compare1d: true,
+                compare5d: true,
+                compare1m: false,
+                compare3m: false,
+                compare1y: false,
+                showPastCap: false,
+                showChangePercent: true,
+                showIcons: true,
+                showLinks: true,
+                includeAnalystSummary: true
+              };
+              if (this._success) setTimeout(() => this._success(data), 10);
+            },
+            getMarketStatus: function() {
+              const data = {
+                nowKst: '2026-10-04 09:30:00',
+                krxPre: { sessionState: 'market_closed', statusText: '08:50 마감' },
+                krxMain: { sessionState: 'in_session', statusText: '개장 중 (실시간)' },
+                krxAfter: { sessionState: 'before_market', statusText: '15:40 대기' },
+                us: { sessionState: 'market_closed', statusText: '휴장 (토/일)' }
+              };
+              if (this._success) setTimeout(() => this._success(data), 10);
+            }
+          }
+        }
+      };
+    }
+
     let telegramBotsList = [];
     let currentPreviewMarketType = null;
     let selectedDomesticSubMarket = 'KOSPI';

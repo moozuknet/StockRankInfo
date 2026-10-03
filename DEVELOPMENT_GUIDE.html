@@ -161,10 +161,21 @@ npx clasp deployments</code></pre>
     </li>
   </ul>
 
-  <h2>6. 🔒 보안 및 깃허브(GitHub) 동기화 정책</h2>
+  <h2>6. 🔒 배포 및 깃허브(GitHub) 동기화 전 필수 절차</h2>
+  <h3>1) 📸 README 문서용 프로그램 최신 스크린샷 갱신 (필수 선행 작업)</h3>
+  <ul>
+    <li><b>원칙:</b> GAS 배포 및 GitHub 푸시 전, UI 변경사항(신규 옵션, 서식, 헤더 버전 등)이 온전히 반영된 최신 대시보드 화면을 캡처하여 <code>assets/dashboard_preview.png</code>를 반드시 최신화해야 합니다.</li>
+    <li><b>보안 준수:</b> 토큰 및 개인 Chat ID는 반드시 마스킹 처리된 상태(플레이스홀더)로 캡처합니다.</li>
+    <li><b>자동 캡처 실행 명령 (Chrome Headless):</b>
+      <pre><code>Start-Process -FilePath "C:\Program Files\Google\Chrome\Application\chrome.exe" -ArgumentList '--headless --disable-gpu --no-sandbox --screenshot=C:\dev\Antigravity\StockRankInfo\assets\dashboard_preview.png --window-size=1280,1850 file:///C:/dev/Antigravity/StockRankInfo/Index.html' -Wait</code></pre>
+    </li>
+  </ul>
+
+  <h3>2) 🚀 Google Apps Script (GAS) 온라인 배포 &amp; GitHub 동기화</h3>
   <ol>
     <li><b>배포 URL 및 인증 토큰 비공개 정책:</b> <code>README.md</code> 및 <code>DEVELOPMENT_GUIDE.md</code> 등 공개 문서에는 개인 배포 Exec URL 및 Bot Token을 직접 기재하지 않습니다.</li>
-    <li><b>마스킹된 스크린샷 에셋:</b> <code>assets/dashboard_preview.png</code>를 사용합니다.</li>
+    <li><b>clasp push &amp; deploy:</b> <code>npx clasp push --force</code> 및 <code>npx clasp deploy -i &lt;DEPLOYMENT_ID&gt;</code>로 온라인 최신 버전 배포.</li>
+    <li><b>GitHub 푸시:</b> <code>git add -A</code> &rarr; <code>git commit</code> &rarr; <code>git push origin main</code>.</li>
   </ol>
 </body>
 </html>
