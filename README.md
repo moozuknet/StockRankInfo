@@ -2,7 +2,7 @@
 
 > **Google Apps Script(GAS)**와 **Modern TailwindCSS Web UI** 기반으로 개발된 한국 증시(NXT 프리마켓 / KRX·NXT 정규장 / 통합 애프터마켓) 및 미국 증시(US 본장) 시가총액 변동 자동 분석 및 텔레그램 리포팅 시스템입니다.
 
-[![Version](https://img.shields.io/badge/version-v2.4.0-blue.svg)](https://github.com/moozuknet/StockRankInfo)
+[![Version](https://img.shields.io/badge/version-v2.5.0-blue.svg)](https://github.com/moozuknet/StockRankInfo)
 [![Platform](https://img.shields.io/badge/platform-Google%20Apps%20Script-green.svg)](https://developers.google.com/apps-script)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 
@@ -37,6 +37,7 @@
      - 조회 범위: 시가총액 상위 10위 / 20위 / 30위 / 50위 선택.
      - 과거 비교 시점: **1일 전 / 5일 전 / 1개월 전 / 3개월 전 / 1년 전** 다중 선택.
      - 과거 시가총액 금액 표기: 비교 시점의 시총 금액(조/억원 또는 $B) 동적 포함.
+     - **최고점 대비 등락률 표기 (`showHighDiff`)**: 종목별 최고가(52주 최고가) 대비 현재가 변동률(+,-%) 및 최고가 금액 노출.
      - 표시 옵션: 등락률(%), 강조 아이콘(🚀 급등, 🔥 상승, 🚨 급락), 종목 상세 HTML 링크(네이버 증권 / 구글 파이낸스).
      - **순위 변동 기준 급등/급락 분석**: 순위 변동폭(rankShift = pastRank - currentRank) 기준의 순위 급등(▲계단) 및 급락(▼계단) 요약.
 

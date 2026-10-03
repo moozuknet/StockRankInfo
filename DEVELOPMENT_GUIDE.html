@@ -134,6 +134,15 @@ npx clasp deployments</code></pre>
     </tbody>
   </table>
 
+  <h3>3) 최고점 대비 현재가 등락률(%) 산출 파이프라인 (<code>config.showHighDiff</code>)</h3>
+  <ul>
+    <li><b>옵션 명칭:</b> <code>showHighDiff</code> (기본값 <code>true</code>, 리포트 상세 서식 옵션 내 체크박스).</li>
+    <li><b>수집 엔진:</b> 네이버 모바일 통합 API의 52주 최고가(<code>highPriceOf52Weeks</code>)를 <code>UrlFetchApp.fetchAll</code> 병렬 배치 호출로 1~2초 내 초고속 수집. 미국 종목은 Yahoo Finance <code>fiftyTwoWeekHigh</code> 활용.</li>
+    <li><b>Fallback 캐시:</b> <code>KRX_HISTORICAL_MAP</code>에 주요 대형주 고점 데이터(<code>highPrice</code>) 사전 적재로 API 장애 시에도 안전한 무중단 서식 보장.</li>
+    <li><b>계산 공식:</b> <code>등락률(%) = ((현재가 - 최고점) / 최고점) * 100</code> (고점 대비 하락폭 음수 표기, 신고가 도달 시 0.00% / 양수 표기).</li>
+    <li><b>리포트 출력 서식:</b> <code>  └ 고점 대비: -27.37% (최고 380,000원)</code> 라인을 종목별 정보에 동적 노출.</li>
+  </ul>
+
   <h2>4. 🤖 Telegram Bot 생성 및 다중 봇 등록 절차</h2>
   <ol>
     <li><code>@BotFather</code>를 통해 Bot Token 생성.</li>

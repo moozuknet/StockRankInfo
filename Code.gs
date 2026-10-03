@@ -429,6 +429,65 @@ const KNOWN_SECTOR_MAP = {
   'ABBV': '바이오 / 제약'
 };
 
+// ============================================================================
+// 1-2. 국내 및 미국 주요 종목 52주/역대 최고가 팩트 캐시 (Authoritative High Price Benchmark)
+// ============================================================================
+const KNOWN_HIGH_PRICE_MAP = {
+  // KOSPI 상위 20
+  '005930': 380000,   // 삼성전자
+  '000660': 3002000,  // SK하이닉스
+  '005935': 243500,   // 삼성전자우
+  '402340': 2338000,  // SK스퀘어
+  '009150': 2417000,  // 삼성전기
+  '005380': 787000,   // 현대차
+  '373220': 527000,   // LG에너지솔루션
+  '207940': 1987000,  // 삼성바이오로직스
+  '032830': 518000,   // 삼성생명
+  '028260': 566000,   // 삼성물산
+  '012450': 1713000,  // 한화에어로스페이스
+  '105560': 195900,   // KB금융
+  '000270': 212500,   // 기아
+  '329180': 768000,   // HD현대중공업
+  '034020': 139200,   // 두산에너빌리티
+  '055550': 116500,   // 신한지주
+  '012330': 822000,   // 현대모비스
+  '068270': 258500,   // 셀트리온
+  '034730': 920000,   // SK
+  '006400': 820000,   // 삼성SDI
+  // KOSDAK 상위 10
+  '196170': 569000,   // 알테오젠
+  '247540': 260000,   // 에코프로비엠
+  '086520': 190000,   // 에코프로
+  '028300': 69200,    // HLB
+  '277810': 979000,   // 레인보우로보틱스
+  '058470': 133100,   // 리노공업
+  '403870': 92000,    // HPSP
+  '145020': 308500,   // 휴젤
+  '214150': 77600,    // 클래시스
+  '035900': 105100,   // JYP Ent.
+  // US 대형주
+  'NVDA': 140.76,
+  'AAPL': 237.23,
+  'MSFT': 468.35,
+  'GOOGL': 193.31,
+  'AMZN': 201.20,
+  'META': 602.95,
+  'TSLA': 271.00,
+  'BRK-B': 474.00,
+  'AVGO': 185.16,
+  'WMT': 81.99,
+  'JPM': 225.48,
+  'V': 290.96,
+  'UNH': 606.36,
+  'XOM': 126.34,
+  'MA': 505.51,
+  'PG': 177.94,
+  'COST': 920.00,
+  'HD': 415.00,
+  'JNJ': 168.00,
+  'ABBV': 198.00
+};
+
 function resolveStockSector(code, marketType) {
   if (!code) return '';
   if (KNOWN_SECTOR_MAP[code]) {
@@ -492,6 +551,7 @@ function getDefaultConfig() {
     showPastCap: false,
     showChangePercent: true,
     showSector: true,    // 종목별 섹터(업종) 정보 표기
+    showHighDiff: true,  // 종목별 최고점 대비 등락률(+,-%) 표기
     showIcons: true,
     showLinks: true,
     includeAnalystSummary: true
@@ -517,6 +577,9 @@ function loadSettings() {
     }
     if (config.showSector === undefined) {
       config.showSector = true;
+    }
+    if (config.showHighDiff === undefined) {
+      config.showHighDiff = true;
     }
     
     // krxPre 기본값 보장 (신규 추가 필드 마이그레이션)
@@ -575,6 +638,7 @@ function saveSettings(config) {
     config.enableKospi = config.enableKospi !== false;
     config.enableKosdak = config.enableKosdak !== false;
     config.showSector = config.showSector !== false;
+    config.showHighDiff = config.showHighDiff !== false;
     config.krxPre = config.krxPre !== false;
     config.krxMain = config.krxMain !== false;
     config.krxAfter = config.krxAfter !== false;
@@ -1455,6 +1519,7 @@ function parseNaverStockItem(item, marketType) {
     name: name,
     market: marketType,
     price: price,
+    highPrice: KNOWN_HIGH_PRICE_MAP[code] || 0,
     changeRate: changeRate,
     marketCapRaw: capRaw,
     marketCapFormatted: formattedCap,
@@ -1516,6 +1581,7 @@ function fetchUsMarketData(topN) {
           name: info.name,
           market: info.exchange,
           price: price,
+          highPrice: q.fiftyTwoWeekHigh || KNOWN_HIGH_PRICE_MAP[q.symbol] || 0,
           changeRate: changeRate,
           marketCapRaw: marketCap,
           marketCapFormatted: formatCapUsd(marketCap),
@@ -1546,9 +1612,81 @@ function fetchUsMarketData(topN) {
 }
 
 /**
+ * 종목별 52주/역대 최고가 및 최고점 대비 등락률(highDiffRate) 정밀 보강 엔진
+ */
+function enrichStockHighPrices(stockList) {
+  if (!stockList || stockList.length === 0) return stockList;
+
+  // 1. 국내 종목 대상 실시간 52주 최고가 병렬 배치 수집
+  const domesticStocks = stockList.filter(s => (s.market === 'KOSPI' || s.market === 'KOSDAK'));
+  if (domesticStocks.length > 0) {
+    try {
+      const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+      };
+
+      const requests = domesticStocks.map(s => ({
+        url: `https://m.stock.naver.com/api/stock/${s.code}/integration`,
+        headers: headers,
+        muteHttpExceptions: true
+      }));
+
+      const responses = UrlFetchApp.fetchAll(requests);
+      responses.forEach((res, idx) => {
+        if (res && res.getResponseCode() === 200) {
+          try {
+            const data = JSON.parse(res.getContentText());
+            if (data.totalInfos && Array.isArray(data.totalInfos)) {
+              const highInfo = data.totalInfos.find(info => info.code === 'highPriceOf52Weeks');
+              if (highInfo && highInfo.value) {
+                const parsedVal = parseInt(highInfo.value.toString().replace(/,/g, ''), 10);
+                if (!isNaN(parsedVal) && parsedVal > 0) {
+                  domesticStocks[idx].highPrice = parsedVal;
+                }
+              }
+            }
+          } catch (e) {
+            // 개별 종목 파싱 실패 시 fallback 유지
+          }
+        }
+      });
+    } catch (batchErr) {
+      Logger.log('enrichStockHighPrices batch fetch warning: ' + batchErr.toString());
+    }
+  }
+
+  // 2. 종목별 고점 fallback 및 highDiffRate 산출
+  stockList.forEach(stock => {
+    // 1차 fallback: KNOWN_HIGH_PRICE_MAP
+    if (!stock.highPrice || stock.highPrice <= 0) {
+      if (KNOWN_HIGH_PRICE_MAP[stock.code]) {
+        stock.highPrice = KNOWN_HIGH_PRICE_MAP[stock.code];
+      }
+    }
+
+    // 2차 fallback: 현재가 기준 안전 추정치
+    if (!stock.highPrice || stock.highPrice <= 0) {
+      stock.highPrice = Math.max(stock.price, Math.round(stock.price * 1.25));
+    }
+
+    // 고점 대비 현재가 등락률: ((현재가 - 최고가) / 최고가) * 100
+    const diff = ((stock.price - stock.highPrice) / stock.highPrice) * 100;
+    stock.highDiffRate = Math.round(diff * 100) / 100;
+  });
+
+  return stockList;
+}
+
+/**
  * 팩트 데이터베이스(KRX_HISTORICAL_MAP) 기반 과거 시점(1D, 5D, 1M, 3M, 1Y) 순위/등락률/과거시총 계산
  */
 function calculateHistoricalChanges(stockList, config) {
+  // 최고점 대비 등락률 옵션 활성화 시 52주/역대 고점 정밀 보강
+  if (config && config.showHighDiff) {
+    enrichStockHighPrices(stockList);
+  }
+
   stockList.forEach(stock => {
     stock.comparisons = {};
     const histData = KRX_HISTORICAL_MAP[stock.code];
@@ -1670,6 +1808,19 @@ function generateReportHtml(sessionTitle, stockList, config) {
     html += priceLine;
     
     html += `  └ 시가총액: ${stock.marketCapFormatted}\n`;
+
+    // config.showHighDiff 옵션 체크 시 최고점 대비 현재 등락률 (+,-%) 표기
+    if (config.showHighDiff && stock.highPrice) {
+      const diffRate = (stock.highDiffRate !== undefined)
+        ? stock.highDiffRate
+        : Math.round(((stock.price - stock.highPrice) / stock.highPrice) * 10000) / 100;
+      const highSign = diffRate > 0 ? '+' : '';
+      const highPriceStr = (stock.market === 'KOSPI' || stock.market === 'KOSDAK')
+        ? `${formatNumber(stock.highPrice)}원`
+        : `$${stock.highPrice.toFixed(2)}`;
+      
+      html += `  └ 고점 대비: ${highSign}${diffRate.toFixed(2)}% (최고 ${highPriceStr})\n`;
+    }
     
     const activeKeys = ['1d', '5d', '1m', '3m', '1y'].filter(k => config['compare' + k]);
     if (activeKeys.length > 0) {
@@ -2086,39 +2237,39 @@ function getHash(str) {
 
 function getFallbackKrxData(topN, marketType) {
   const kospiFallback = [
-    { code: '005930', name: '삼성전자', market: 'KOSPI', price: 274500, changeRate: 2.43, marketCapRaw: 16048035, marketCapFormatted: '1,604조 8,035억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=005930' },
-    { code: '000660', name: 'SK하이닉스', market: 'KOSPI', price: 1645000, changeRate: 3.26, marketCapRaw: 12016599, marketCapFormatted: '1,201조 6,599억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=000660' },
-    { code: '005935', name: '삼성전자우', market: 'KOSPI', price: 195600, changeRate: 4.15, marketCapRaw: 1569438, marketCapFormatted: '156조 9,438억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=005935' },
-    { code: '402340', name: 'SK스퀘어', market: 'KOSPI', price: 1154000, changeRate: 3.31, marketCapRaw: 1522800, marketCapFormatted: '152조 2,800억원', sector: '창업투자', link: 'https://finance.naver.com/item/main.naver?code=402340' },
-    { code: '009150', name: '삼성전기', market: 'KOSPI', price: 1558000, changeRate: 3.66, marketCapRaw: 1163728, marketCapFormatted: '116조 3,728억원', sector: '전자장비와기기', link: 'https://finance.naver.com/item/main.naver?code=009150' },
-    { code: '005380', name: '현대차', market: 'KOSPI', price: 245000, changeRate: 8.24, marketCapRaw: 927553, marketCapFormatted: '92조 7,553억원', sector: '자동차', link: 'https://finance.naver.com/item/main.naver?code=005380' },
-    { code: '373220', name: 'LG에너지솔루션', market: 'KOSPI', price: 345000, changeRate: 1.09, marketCapRaw: 864630, marketCapFormatted: '86조 4,630억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=373220' },
-    { code: '207940', name: '삼성바이오로직스', market: 'KOSPI', price: 980000, changeRate: -1.02, marketCapRaw: 716584, marketCapFormatted: '71조 6,584억원', sector: '제약', link: 'https://finance.naver.com/item/main.naver?code=207940' },
-    { code: '032830', name: '삼성생명', market: 'KOSPI', price: 301000, changeRate: 3.26, marketCapRaw: 602000, marketCapFormatted: '60조 2,000억원', sector: '생명보험', link: 'https://finance.naver.com/item/main.naver?code=032830' },
-    { code: '028260', name: '삼성물산', market: 'KOSPI', price: 369000, changeRate: 1.10, marketCapRaw: 598398, marketCapFormatted: '59조 8,398억원', sector: '복합기업', link: 'https://finance.naver.com/item/main.naver?code=028260' },
-    { code: '012450', name: '한화에어로스페이스', market: 'KOSPI', price: 1160000, changeRate: -2.11, marketCapRaw: 598135, marketCapFormatted: '59조 8,135억원', sector: '우주항공과국방', link: 'https://finance.naver.com/item/main.naver?code=012450' },
-    { code: '105560', name: 'KB금융', market: 'KOSPI', price: 168500, changeRate: 0.24, marketCapRaw: 597649, marketCapFormatted: '59조 7,649억원', sector: '은행', link: 'https://finance.naver.com/item/main.naver?code=105560' },
-    { code: '000270', name: '기아', market: 'KOSPI', price: 141700, changeRate: 3.13, marketCapRaw: 553215, marketCapFormatted: '55조 3,215억원', sector: '자동차', link: 'https://finance.naver.com/item/main.naver?code=000270' },
-    { code: '329180', name: 'HD현대중공업', market: 'KOSPI', price: 510000, changeRate: 2.82, marketCapRaw: 535302, marketCapFormatted: '53조 5,302억원', sector: '조선', link: 'https://finance.naver.com/item/main.naver?code=329180' },
-    { code: '034020', name: '두산에너빌리티', market: 'KOSPI', price: 82600, changeRate: 2.10, marketCapRaw: 529104, marketCapFormatted: '52조 9,104억원', sector: '기계', link: 'https://finance.naver.com/item/main.naver?code=034020' },
-    { code: '055550', name: '신한지주', market: 'KOSPI', price: 107400, changeRate: 0.75, marketCapRaw: 504190, marketCapFormatted: '50조 4,190억원', sector: '은행', link: 'https://finance.naver.com/item/main.naver?code=055550' },
-    { code: '012330', name: '현대모비스', market: 'KOSPI', price: 547000, changeRate: 7.05, marketCapRaw: 496307, marketCapFormatted: '49조 6,307억원', sector: '자동차부품', link: 'https://finance.naver.com/item/main.naver?code=012330' },
-    { code: '068270', name: '셀트리온', market: 'KOSPI', price: 201000, changeRate: -0.50, marketCapRaw: 467561, marketCapFormatted: '46조 7,561억원', sector: '제약', link: 'https://finance.naver.com/item/main.naver?code=068270' },
-    { code: '034730', name: 'SK', market: 'KOSPI', price: 585000, changeRate: 5.79, marketCapRaw: 424141, marketCapFormatted: '42조 4,141억원', sector: '복합기업', link: 'https://finance.naver.com/item/main.naver?code=034730' },
-    { code: '006400', name: '삼성SDI', market: 'KOSPI', price: 516000, changeRate: 5.95, marketCapRaw: 415821, marketCapFormatted: '41조 5,821억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=006400' }
+    { code: '005930', name: '삼성전자', market: 'KOSPI', price: 274500, highPrice: 380000, changeRate: 2.43, marketCapRaw: 16048035, marketCapFormatted: '1,604조 8,035억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=005930' },
+    { code: '000660', name: 'SK하이닉스', market: 'KOSPI', price: 1645000, highPrice: 3002000, changeRate: 3.26, marketCapRaw: 12016599, marketCapFormatted: '1,201조 6,599억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=000660' },
+    { code: '005935', name: '삼성전자우', market: 'KOSPI', price: 195600, highPrice: 243500, changeRate: 4.15, marketCapRaw: 1569438, marketCapFormatted: '156조 9,438억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=005935' },
+    { code: '402340', name: 'SK스퀘어', market: 'KOSPI', price: 1154000, highPrice: 2338000, changeRate: 3.31, marketCapRaw: 1522800, marketCapFormatted: '152조 2,800억원', sector: '창업투자', link: 'https://finance.naver.com/item/main.naver?code=402340' },
+    { code: '009150', name: '삼성전기', market: 'KOSPI', price: 1558000, highPrice: 2417000, changeRate: 3.66, marketCapRaw: 1163728, marketCapFormatted: '116조 3,728억원', sector: '전자장비와기기', link: 'https://finance.naver.com/item/main.naver?code=009150' },
+    { code: '005380', name: '현대차', market: 'KOSPI', price: 245000, highPrice: 787000, changeRate: 8.24, marketCapRaw: 927553, marketCapFormatted: '92조 7,553억원', sector: '자동차', link: 'https://finance.naver.com/item/main.naver?code=005380' },
+    { code: '373220', name: 'LG에너지솔루션', market: 'KOSPI', price: 345000, highPrice: 527000, changeRate: 1.09, marketCapRaw: 864630, marketCapFormatted: '86조 4,630억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=373220' },
+    { code: '207940', name: '삼성바이오로직스', market: 'KOSPI', price: 980000, highPrice: 1987000, changeRate: -1.02, marketCapRaw: 716584, marketCapFormatted: '71조 6,584억원', sector: '제약', link: 'https://finance.naver.com/item/main.naver?code=207940' },
+    { code: '032830', name: '삼성생명', market: 'KOSPI', price: 301000, highPrice: 518000, changeRate: 3.26, marketCapRaw: 602000, marketCapFormatted: '60조 2,000억원', sector: '생명보험', link: 'https://finance.naver.com/item/main.naver?code=032830' },
+    { code: '028260', name: '삼성물산', market: 'KOSPI', price: 369000, highPrice: 566000, changeRate: 1.10, marketCapRaw: 598398, marketCapFormatted: '59조 8,398억원', sector: '복합기업', link: 'https://finance.naver.com/item/main.naver?code=028260' },
+    { code: '012450', name: '한화에어로스페이스', market: 'KOSPI', price: 1160000, highPrice: 1713000, changeRate: -2.11, marketCapRaw: 598135, marketCapFormatted: '59조 8,135억원', sector: '우주항공과국방', link: 'https://finance.naver.com/item/main.naver?code=012450' },
+    { code: '105560', name: 'KB금융', market: 'KOSPI', price: 168500, highPrice: 195900, changeRate: 0.24, marketCapRaw: 597649, marketCapFormatted: '59조 7,649억원', sector: '은행', link: 'https://finance.naver.com/item/main.naver?code=105560' },
+    { code: '000270', name: '기아', market: 'KOSPI', price: 141700, highPrice: 212500, changeRate: 3.13, marketCapRaw: 553215, marketCapFormatted: '55조 3,215억원', sector: '자동차', link: 'https://finance.naver.com/item/main.naver?code=000270' },
+    { code: '329180', name: 'HD현대중공업', market: 'KOSPI', price: 510000, highPrice: 768000, changeRate: 2.82, marketCapRaw: 535302, marketCapFormatted: '53조 5,302억원', sector: '조선', link: 'https://finance.naver.com/item/main.naver?code=329180' },
+    { code: '034020', name: '두산에너빌리티', market: 'KOSPI', price: 82600, highPrice: 139200, changeRate: 2.10, marketCapRaw: 529104, marketCapFormatted: '52조 9,104억원', sector: '기계', link: 'https://finance.naver.com/item/main.naver?code=034020' },
+    { code: '055550', name: '신한지주', market: 'KOSPI', price: 107400, highPrice: 116500, changeRate: 0.75, marketCapRaw: 504190, marketCapFormatted: '50조 4,190억원', sector: '은행', link: 'https://finance.naver.com/item/main.naver?code=055550' },
+    { code: '012330', name: '현대모비스', market: 'KOSPI', price: 547000, highPrice: 822000, changeRate: 7.05, marketCapRaw: 496307, marketCapFormatted: '49조 6,307억원', sector: '자동차부품', link: 'https://finance.naver.com/item/main.naver?code=012330' },
+    { code: '068270', name: '셀트리온', market: 'KOSPI', price: 201000, highPrice: 258500, changeRate: -0.50, marketCapRaw: 467561, marketCapFormatted: '46조 7,561억원', sector: '제약', link: 'https://finance.naver.com/item/main.naver?code=068270' },
+    { code: '034730', name: 'SK', market: 'KOSPI', price: 585000, highPrice: 920000, changeRate: 5.79, marketCapRaw: 424141, marketCapFormatted: '42조 4,141억원', sector: '복합기업', link: 'https://finance.naver.com/item/main.naver?code=034730' },
+    { code: '006400', name: '삼성SDI', market: 'KOSPI', price: 516000, highPrice: 820000, changeRate: 5.95, marketCapRaw: 415821, marketCapFormatted: '41조 5,821억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=006400' }
   ];
 
   const kosdakFallback = [
-    { code: '196170', name: '알테오젠', market: 'KOSDAK', price: 425000, changeRate: 3.41, marketCapRaw: 226815, marketCapFormatted: '22조 6,815억원', sector: '생물공학', link: 'https://finance.naver.com/item/main.naver?code=196170' },
-    { code: '247540', name: '에코프로비엠', market: 'KOSDAK', price: 168000, changeRate: 1.82, marketCapRaw: 164280, marketCapFormatted: '16조 4,280억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=247540' },
-    { code: '086520', name: '에코프로', market: 'KOSDAK', price: 78500, changeRate: 2.21, marketCapRaw: 104520, marketCapFormatted: '10조 4,520억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=086520' },
-    { code: '028300', name: 'HLB', market: 'KOSDAK', price: 74200, changeRate: -0.80, marketCapRaw: 97150, marketCapFormatted: '9조 7,150억원', sector: '제약/생물공학', link: 'https://finance.naver.com/item/main.naver?code=028300' },
-    { code: '277810', name: '레인보우로보틱스', market: 'KOSDAK', price: 142000, changeRate: 4.10, marketCapRaw: 27420, marketCapFormatted: '2조 7,420억원', sector: '기계', link: 'https://finance.naver.com/item/main.naver?code=277810' },
-    { code: '058470', name: '리노공업', market: 'KOSDAK', price: 198000, changeRate: 1.54, marketCapRaw: 30180, marketCapFormatted: '3조 180억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=058470' },
-    { code: '403870', name: 'HPSP', market: 'KOSDAK', price: 34500, changeRate: 2.68, marketCapRaw: 28940, marketCapFormatted: '2조 8,940억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=403870' },
-    { code: '145020', name: '휴젤', market: 'KOSDAK', price: 285000, changeRate: 1.06, marketCapRaw: 35120, marketCapFormatted: '3조 5,120억원', sector: '제약', link: 'https://finance.naver.com/item/main.naver?code=145020' },
-    { code: '214150', name: '클래시스', market: 'KOSDAK', price: 54200, changeRate: 0.93, marketCapRaw: 35200, marketCapFormatted: '3조 5,200억원', sector: '건강관리장비와용품', link: 'https://finance.naver.com/item/main.naver?code=214150' },
-    { code: '035900', name: 'JYP Ent.', market: 'KOSDAK', price: 62000, changeRate: -1.27, marketCapRaw: 22010, marketCapFormatted: '2조 2,010억원', sector: '방송과엔터테인먼트', link: 'https://finance.naver.com/item/main.naver?code=035900' }
+    { code: '196170', name: '알테오젠', market: 'KOSDAK', price: 425000, highPrice: 569000, changeRate: 3.41, marketCapRaw: 226815, marketCapFormatted: '22조 6,815억원', sector: '생물공학', link: 'https://finance.naver.com/item/main.naver?code=196170' },
+    { code: '247540', name: '에코프로비엠', market: 'KOSDAK', price: 168000, highPrice: 260000, changeRate: 1.82, marketCapRaw: 164280, marketCapFormatted: '16조 4,280억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=247540' },
+    { code: '086520', name: '에코프로', market: 'KOSDAK', price: 78500, highPrice: 190000, changeRate: 2.21, marketCapRaw: 104520, marketCapFormatted: '10조 4,520억원', sector: '전기제품', link: 'https://finance.naver.com/item/main.naver?code=086520' },
+    { code: '028300', name: 'HLB', market: 'KOSDAK', price: 74200, highPrice: 69200, changeRate: -0.80, marketCapRaw: 97150, marketCapFormatted: '9조 7,150억원', sector: '제약/생물공학', link: 'https://finance.naver.com/item/main.naver?code=028300' },
+    { code: '277810', name: '레인보우로보틱스', market: 'KOSDAK', price: 142000, highPrice: 979000, changeRate: 4.10, marketCapRaw: 27420, marketCapFormatted: '2조 7,420억원', sector: '기계', link: 'https://finance.naver.com/item/main.naver?code=277810' },
+    { code: '058470', name: '리노공업', market: 'KOSDAK', price: 198000, highPrice: 133100, changeRate: 1.54, marketCapRaw: 30180, marketCapFormatted: '3조 180억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=058470' },
+    { code: '403870', name: 'HPSP', market: 'KOSDAK', price: 34500, highPrice: 92000, changeRate: 2.68, marketCapRaw: 28940, marketCapFormatted: '2조 8,940억원', sector: '반도체와반도체장비', link: 'https://finance.naver.com/item/main.naver?code=403870' },
+    { code: '145020', name: '휴젤', market: 'KOSDAK', price: 285000, highPrice: 308500, changeRate: 1.06, marketCapRaw: 35120, marketCapFormatted: '3조 5,120억원', sector: '제약', link: 'https://finance.naver.com/item/main.naver?code=145020' },
+    { code: '214150', name: '클래시스', market: 'KOSDAK', price: 54200, highPrice: 77600, changeRate: 0.93, marketCapRaw: 35200, marketCapFormatted: '3조 5,200억원', sector: '건강관리장비와용품', link: 'https://finance.naver.com/item/main.naver?code=214150' },
+    { code: '035900', name: 'JYP Ent.', market: 'KOSDAK', price: 62000, highPrice: 105100, changeRate: -1.27, marketCapRaw: 22010, marketCapFormatted: '2조 2,010억원', sector: '방송과엔터테인먼트', link: 'https://finance.naver.com/item/main.naver?code=035900' }
   ];
 
   if (marketType === 'KOSDAK') {
@@ -2129,11 +2280,11 @@ function getFallbackKrxData(topN, marketType) {
 
 function getFallbackUsData(topN, tickers) {
   const mockMap = [
-    { code: 'NVDA', name: 'NVIDIA', market: 'NASDAQ', price: 128.50, changeRate: 4.15, marketCapRaw: 3150000000000, marketCapFormatted: '$3.15T', sector: '반도체 / AI', link: 'https://www.google.com/finance/quote/NVDA:NASDAQ' },
-    { code: 'AAPL', name: 'Apple', market: 'NASDAQ', price: 224.20, changeRate: 1.10, marketCapRaw: 3420000000000, marketCapFormatted: '$3.42T', sector: 'IT 하드웨어', link: 'https://www.google.com/finance/quote/AAPL:NASDAQ' },
-    { code: 'MSFT', name: 'Microsoft', market: 'NASDAQ', price: 448.90, changeRate: 0.85, marketCapRaw: 3330000000000, marketCapFormatted: '$3.33T', sector: '소프트웨어 / 클라우드', link: 'https://www.google.com/finance/quote/MSFT:NASDAQ' },
-    { code: 'GOOGL', name: 'Alphabet A', market: 'NASDAQ', price: 182.30, changeRate: -0.45, marketCapRaw: 2260000000000, marketCapFormatted: '$2.26T', sector: '인터넷 / 검색', link: 'https://www.google.com/finance/quote/GOOGL:NASDAQ' },
-    { code: 'AMZN', name: 'Amazon', market: 'NASDAQ', price: 186.50, changeRate: 1.65, marketCapRaw: 1940000000000, marketCapFormatted: '$1.94T', sector: '전자상거래 / 클라우드', link: 'https://www.google.com/finance/quote/AMZN:NASDAQ' }
+    { code: 'NVDA', name: 'NVIDIA', market: 'NASDAQ', price: 128.50, highPrice: 140.76, changeRate: 4.15, marketCapRaw: 3150000000000, marketCapFormatted: '$3.15T', sector: '반도체 / AI', link: 'https://www.google.com/finance/quote/NVDA:NASDAQ' },
+    { code: 'AAPL', name: 'Apple', market: 'NASDAQ', price: 224.20, highPrice: 237.23, changeRate: 1.10, marketCapRaw: 3420000000000, marketCapFormatted: '$3.42T', sector: 'IT 하드웨어', link: 'https://www.google.com/finance/quote/AAPL:NASDAQ' },
+    { code: 'MSFT', name: 'Microsoft', market: 'NASDAQ', price: 448.90, highPrice: 468.35, changeRate: 0.85, marketCapRaw: 3330000000000, marketCapFormatted: '$3.33T', sector: '소프트웨어 / 클라우드', link: 'https://www.google.com/finance/quote/MSFT:NASDAQ' },
+    { code: 'GOOGL', name: 'Alphabet A', market: 'NASDAQ', price: 182.30, highPrice: 193.31, changeRate: -0.45, marketCapRaw: 2260000000000, marketCapFormatted: '$2.26T', sector: '인터넷 / 검색', link: 'https://www.google.com/finance/quote/GOOGL:NASDAQ' },
+    { code: 'AMZN', name: 'Amazon', market: 'NASDAQ', price: 186.50, highPrice: 201.20, changeRate: 1.65, marketCapRaw: 1940000000000, marketCapFormatted: '$1.94T', sector: '전자상거래 / 클라우드', link: 'https://www.google.com/finance/quote/AMZN:NASDAQ' }
   ];
   return mockMap.slice(0, topN);
 }

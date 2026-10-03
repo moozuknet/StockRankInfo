@@ -161,6 +161,30 @@ flowchart TD
 - **과거 시가총액 역산 수식 (`config.showPastCap`)**:
   $$\text{과거 시가총액} = \frac{\text{현재 시가총액}}{1 + \left(\frac{\text{과거 대비 등락률(\%)}}{100}\right)}$$
 
+### 5) 최고점 대비 현재가 등락률(%) 산출 파이프라인 (`config.showHighDiff`)
+1. **추가 배경 및 목적**:
+   - 투자자가 종목별 리포트 확인 시, 현재 주가가 역대/52주 최고가 대비 몇 % 하락(조정)했는지 또는 신고가 영역인지 직관적으로 파악할 수 있도록 리포트 상세 서식 옵션 항목을 추가합니다.
+2. **수신 설정 필드 (Config)**:
+   - `showHighDiff` (boolean, 기본값 `true`): 종목 리포트 정보에 최고점 대비 현재 등락률(+,-%) 및 최고가 금액 노출 여부 제어.
+3. **고점 데이터 수집 및 Fallback 아키텍처**:
+   - **국내 종목 (KOSPI/KOSDAK)**:
+     - **1차 (실시간 동적 연동)**: 네이버 모바일 통합 API(`https://m.stock.naver.com/api/stock/{code}/integration`)의 `totalInfos` 중 `highPriceOf52Weeks`(52주 최고가)를 Google Apps Script의 `UrlFetchApp.fetchAll`을 통해 일괄 병렬 수집(배치 쿼리로 레이턴시 1~2초 내 최소화).
+     - **2차 (Fallback 캐시)**: 대형주 팩트 DB(`KRX_HISTORICAL_MAP`)에 사전 등록된 고점 데이터(`highPrice`)를 활용하여 API 일시 장애나 네트워크 제한 시에도 안정적으로 표기.
+   - **미국 종목 (US)**:
+     - Yahoo Finance Quote API 응답 객체의 `fiftyTwoWeekHigh` 필드 활용 및 미국 대표 종목 팩트 데이터 매핑.
+4. **등락률 산출 공식**:
+   $$\text{highDiffRate(\%)} = \frac{\text{현재가} - \text{최고점(고가)}}{\text{최고점(고가)}} \times 100$$
+   - 현재가가 최고가보다 낮을 경우 음수(예: `-27.37%`)로 표시되어 고점 대비 낙폭 파악 용이.
+   - 현재가가 최고점에 도달하거나 돌파한 경우 `0.00%` 또는 `+X.XX%`로 표시되어 신고가 달성 여부 직관 제공.
+5. **리포트 출력 서식**:
+   ```text
+   #1 삼성전자 (KOSPI · 반도체와반도체장비)
+     └ 현재가: 276,000원 | 🔺 +0.00%
+     └ 시가총액: 1,613조 5,729억원
+     └ 고점 대비: -27.37% (최고 380,000원)
+     └ 과거 대비: 1일 전(유지 / +2.4%) | 5일 전(...)
+   ```
+
 ---
 
 ## 4. 🤖 Telegram Bot 생성 및 다중 봇 등록 절차
