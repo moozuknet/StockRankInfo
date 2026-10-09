@@ -89,7 +89,7 @@ flowchart TD
             SECTOR_CACHE["대형주 팩트 섹터 캐시 DB<br>(KNOWN_SECTOR_MAP)"]
             SECTOR_DYNAMIC["실시간 industryCode 동적 분석"]
         end
-        API_US["Yahoo Finance v7 API<br>(NYSE / NASDAQ)"]
+        API_US["네이버 증권 해외 마켓 API<br>(NASDAQ / NYSE 시총 랭킹)"]
         DB[(KRX_HISTORICAL_MAP)]
         Engine["Historical Calculation & Momentum Engine"]
     end
@@ -171,7 +171,8 @@ flowchart TD
      - **1차 (실시간 동적 연동)**: 네이버 모바일 통합 API(`https://m.stock.naver.com/api/stock/{code}/integration`)의 `totalInfos` 중 `highPriceOf52Weeks`(52주 최고가)를 Google Apps Script의 `UrlFetchApp.fetchAll`을 통해 일괄 병렬 수집(배치 쿼리로 레이턴시 1~2초 내 최소화).
      - **2차 (Fallback 캐시)**: 대형주 팩트 DB(`KRX_HISTORICAL_MAP`)에 사전 등록된 고점 데이터(`highPrice`)를 활용하여 API 일시 장애나 네트워크 제한 시에도 안정적으로 표기.
    - **미국 종목 (US)**:
-     - Yahoo Finance Quote API 응답 객체의 `fiftyTwoWeekHigh` 필드 활용 및 미국 대표 종목 팩트 데이터 매핑.
+      - **1차 (실시간 동적 연동)**: 네이버 해외 주식 Basic API(https://api.stock.naver.com/stock/{reutersCode}/basic)의 stockItemTotalInfos 중 highPriceOf52Weeks를 일괄 병렬 수집(UrlFetchApp.fetchAll 배치 쿼리).
+      - **2차 (Fallback 캐시)**: 미국 대표 종목 팩트 캐시 데이터(KNOWN_HIGH_PRICE_MAP) 및 현재가 기반 안전 추정치 적용.
 4. **등락률 산출 공식**:
    $$\text{highDiffRate(\%)} = \frac{\text{현재가} - \text{최고점(고가)}}{\text{최고점(고가)}} \times 100$$
    - 현재가가 최고가보다 낮을 경우 음수(예: `-27.37%`)로 표시되어 고점 대비 낙폭 파악 용이.
@@ -215,6 +216,22 @@ flowchart TD
 - 매일 새벽 01:00 KST에 `dailyTriggerCheck` 함수가 실행되어 서머타임 전환 시점 당일에 자동으로 트리거 시각을 재설정합니다.
 
 ---
+
+### 4) 📊 공식 시장 지수 차트 & 시가총액 히트맵(트리맵) 엔진
+1. **네이버 증권 공식 지수 차트**:
+   - 코스피: `https://ssl.pstatic.net/imgfinance/chart/main/KOSPI.png`
+   - 코스닥: `https://ssl.pstatic.net/imgfinance/chart/main/KOSDAQ.png`
+   - 나스닥 종합: `https://ssl.pstatic.net/imgfinance/chart/world/continent/NAS@IXIC.png`
+   - S&P 500: `https://ssl.pstatic.net/imgfinance/chart/world/continent/SPI@SPX.png`
+   - **텔레그램 캐시 방지**: URL 뒤에 `?t=${Date.now()}` 실시간 타임스탬프를 동적 부착하여, 텔레그램 서버가 항상 최신 마감 차트를 새로 로드하도록 보장합니다.
+2. **시가총액 비율 기반 히트맵(트리맵) 이미지**:
+   - `generateMarketHeatmapUrl(stockList, marketType)`: QuickChart Graphviz의 `patchwork` 알고리즘을 활용하여 상위 종목의 시가총액에 비례하는 사각형 면적(`area`)과 당일 등락률 기반 색상 코딩을 동적 생성합니다.
+   - 국내 증시: 상승=빨강, 하락=파랑
+   - 미국 증시: 상승=초록, 하락=빨강
+3. **3단계 순차 전송 파이프라인(`sendTelegramReportWithPhotos`)**:
+   - **1단계**: [리포트 헤더 & 지수 종합 시황] 텍스트 발송
+   - **2단계**: [네이버 공식 차트 + 시총 히트맵] 사진 앨범(`sendMediaGroup`) 발송 (시황 바로 아래 위치)
+   - **3단계**: [종목별 시총 순위 분석 & 애널리스트 요약] 본문 텍스트 발송
 
 ## 6. 🔒 배포 및 깃허브(GitHub) 동기화 전 필수 절차
 

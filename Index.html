@@ -414,6 +414,10 @@
               <input type="checkbox" id="includeAnalystSummary" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
               <span class="text-xs font-semibold text-sky-400">💡 수급 및 섹터 모멘텀 요약 첨부</span>
             </label>
+            <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
+              <input type="checkbox" id="enableHeatmap" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
+              <span class="text-xs font-semibold text-rose-400">🗺️ 시가총액 히트맵(트리맵) 이미지 첨부</span>
+            </label>
           </div>
         </div>
       </div>
@@ -589,6 +593,7 @@
                 telegramBots: [{ id: 'bot_1', name: '알림 봇 (운영)', token: '•••••••••••••••••••••••••', chatId: '••••••••••', enabled: true }],
                 enableKospi: true,
                 enableKosdak: true,
+                enableHeatmap: true,
                 showSector: true,
                 showHighDiff: true,
                 krxPre: true,
@@ -1010,6 +1015,7 @@
       document.getElementById('showIcons').checked = !!config.showIcons;
       document.getElementById('showLinks').checked = !!config.showLinks;
       document.getElementById('includeAnalystSummary').checked = !!config.includeAnalystSummary;
+      document.getElementById('enableHeatmap').checked = (config.enableHeatmap !== false);
       
       showStatus('ready', '정상 연결됨');
     }
@@ -1026,6 +1032,7 @@
         telegramChatId: primaryBot.chatId || '',
         enableKospi: document.getElementById('enableKospi').checked,
         enableKosdak: document.getElementById('enableKosdak').checked,
+        enableHeatmap: document.getElementById('enableHeatmap').checked,
         showSector: document.getElementById('showSector').checked,
         showHighDiff: document.getElementById('showHighDiff').checked,
         krxPre: document.getElementById('krxPre').checked,

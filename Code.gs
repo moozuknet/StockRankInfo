@@ -536,6 +536,7 @@ function getDefaultConfig() {
     telegramChatId: '',
     enableKospi: true,   // 코스피 시장 분석 수신 여부
     enableKosdak: true,  // 코스닥 시장 분석 수신 여부
+    enableHeatmap: true, // 시황 바로 아래 시가총액 히트맵(트리맵) 이미지 함께 전송
     krxPre: true,        // 08:55 NXT 장전 프리마켓 마감 알림
     krxMain: true,       // 15:35 KRX/NXT 정규 메인마켓 마감 알림
     krxAfter: true,      // 20:05 KRX/NXT 야간 통합 애프터마켓 마감 알림
@@ -758,7 +759,8 @@ function previewReport(marketType, subMarket) {
     }
     
     const processed = calculateHistoricalChanges(data, config);
-    const htmlMessage = generateReportHtml(sessionTitle, processed, config);
+    const indices = fetchMarketIndices(marketType === 'usMain' ? 'US' : domesticMarket);
+    const htmlMessage = generateReportHtml(sessionTitle, processed, config, indices);
     
     return {
       success: true,
@@ -1528,86 +1530,241 @@ function parseNaverStockItem(item, marketType) {
   };
 }
 
-function fetchUsMarketData(topN) {
-  const usStockTickers = [
-    { ticker: 'NVDA', name: 'NVIDIA', exchange: 'NASDAQ' },
-    { ticker: 'AAPL', name: 'Apple', exchange: 'NASDAQ' },
-    { ticker: 'MSFT', name: 'Microsoft', exchange: 'NASDAQ' },
-    { ticker: 'GOOGL', name: 'Alphabet A', exchange: 'NASDAQ' },
-    { ticker: 'AMZN', name: 'Amazon', exchange: 'NASDAQ' },
-    { ticker: 'META', name: 'Meta', exchange: 'NASDAQ' },
-    { ticker: 'BRK-B', name: 'Berkshire Hathaway', exchange: 'NYSE' },
-    { ticker: 'TSLA', name: 'Tesla', exchange: 'NASDAQ' },
-    { ticker: 'AVGO', name: 'Broadcom', exchange: 'NASDAQ' },
-    { ticker: 'WMT', name: 'Walmart', exchange: 'NYSE' },
-    { ticker: 'JPM', name: 'JPMorgan Chase', exchange: 'NYSE' },
-    { ticker: 'V', name: 'Visa', exchange: 'NYSE' },
-    { ticker: 'UNH', name: 'UnitedHealth', exchange: 'NYSE' },
-    { ticker: 'XOM', name: 'ExxonMobil', exchange: 'NYSE' },
-    { ticker: 'MA', name: 'Mastercard', exchange: 'NYSE' },
-    { ticker: 'PG', name: 'Procter & Gamble', exchange: 'NYSE' },
-    { ticker: 'COST', name: 'Costco', exchange: 'NASDAQ' },
-    { ticker: 'HD', name: 'Home Depot', exchange: 'NYSE' },
-    { ticker: 'JNJ', name: 'Johnson & Johnson', exchange: 'NYSE' },
-    { ticker: 'ABBV', name: 'AbbVie', exchange: 'NYSE' }
-  ];
+/**
+ * 국내 및 미국 증시 대표 시장 지수(코스피/코스닥/나스닥/S&P 500) 및 공식 차트 이미지 수집 엔진
+ */
+function fetchMarketIndices(marketType) {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*'
+  };
+
+  try {
+    if (marketType === 'KOSPI' || marketType === 'KOSDAK' || marketType === 'krxPre' || marketType === 'krxMain' || marketType === 'krxAfter' || marketType === 'krxNxt') {
+      const url = 'https://m.stock.naver.com/api/home/majors';
+      const res = UrlFetchApp.fetch(url, { headers: headers, muteHttpExceptions: true });
+      if (res.getResponseCode() === 200) {
+        const data = JSON.parse(res.getContentText());
+        const majors = data.homeMajors || [];
+        const kospi = majors.find(m => m.itemCode === 'KOSPI');
+        const kosdak = majors.find(m => m.itemCode === 'KOSDAQ');
+        return {
+          targetMarket: marketType === 'KOSDAK' ? 'KOSDAK' : 'KOSPI',
+          kospi: kospi ? {
+            name: '코스피',
+            price: kospi.closePrice,
+            change: kospi.compareToPreviousClosePrice,
+            rate: kospi.fluctuationsRatio,
+            chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSPI.png'
+          } : null,
+          kosdak: kosdak ? {
+            name: '코스닥',
+            price: kosdak.closePrice,
+            change: kosdak.compareToPreviousClosePrice,
+            rate: kosdak.fluctuationsRatio,
+            chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSDAQ.png'
+          } : null
+        };
+      }
+    } else if (marketType === 'US' || marketType === 'usMain') {
+      // 나스닥 종합 (.IXIC) & S&P 500 (.INX)
+      const requests = [
+        { url: 'https://api.stock.naver.com/index/.IXIC/basic', headers: headers, muteHttpExceptions: true },
+        { url: 'https://api.stock.naver.com/index/.INX/basic', headers: headers, muteHttpExceptions: true }
+      ];
+      const responses = UrlFetchApp.fetchAll(requests);
+      let nasdaq = null;
+      let spx = null;
+
+      if (responses[0] && responses[0].getResponseCode() === 200) {
+        try {
+          const d = JSON.parse(responses[0].getContentText());
+          nasdaq = {
+            name: '나스닥 종합',
+            price: d.closePrice || d.closePriceRaw,
+            change: d.compareToPreviousClosePrice || d.compareToPreviousClosePriceRaw,
+            rate: d.fluctuationsRatio || d.fluctuationsRatioRaw,
+            chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/world/continent/NAS@IXIC.png'
+          };
+        } catch (e) {}
+      }
+
+      if (responses[1] && responses[1].getResponseCode() === 200) {
+        try {
+          const d = JSON.parse(responses[1].getContentText());
+          spx = {
+            name: 'S&P 500',
+            price: d.closePrice || d.closePriceRaw,
+            change: d.compareToPreviousClosePrice || d.compareToPreviousClosePriceRaw,
+            rate: d.fluctuationsRatio || d.fluctuationsRatioRaw,
+            chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/world/continent/SPI@SPX.png'
+          };
+        } catch (e) {}
+      }
+
+      return {
+        targetMarket: 'US',
+        nasdaq: nasdaq,
+        spx: spx
+      };
+    }
+  } catch (err) {
+    Logger.log('fetchMarketIndices error: ' + err.toString());
+  }
+  return null;
+}
+
+/**
+ * 종목 리스트(시가총액 상위 종목) 기반 시가총액 비율 및 등락률 히트맵(트리맵) 이미지 생성
+ * - 네모난 영역(Patchwork Treemap)으로 시총 비율을 시각화
+ * - 국내 증시: 상승=빨강, 하락=파랑
+ * - 미국 증시: 상승=초록, 하락=빨강
+ */
+function generateMarketHeatmapUrl(stockList, marketType) {
+  if (!stockList || !Array.isArray(stockList) || stockList.length === 0) return null;
   
   try {
-    const reqList = usStockTickers.slice(0, Math.min(topN + 10, usStockTickers.length));
-    const tickersStr = reqList.map(item => item.ticker).join(',');
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickersStr}`;
+    const isUs = marketType === 'US';
+    const width = 800;
+    const height = 550;
+    const targetStocks = stockList.slice(0, 12); // 상위 12개 주요 종목 대상
     
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    };
-    
-    const response = UrlFetchApp.fetch(url, { headers: headers, muteHttpExceptions: true });
-    let stocks = [];
-    
-    if (response.getResponseCode() === 200) {
-      const data = JSON.parse(response.getContentText());
-      const quotes = (data.quoteResponse && data.quoteResponse.result) ? data.quoteResponse.result : [];
+    const nodes = targetStocks.map((s, idx) => {
+      const change = typeof s.changeRate === 'number' ? s.changeRate : 0;
+      const sign = change > 0 ? '+' : '';
+      let color;
+      if (isUs) {
+        if (change >= 2) color = '#15803d'; // 진한 초록
+        else if (change > 0) color = '#22c55e'; // 밝은 초록
+        else if (change <= -2) color = '#b91c1c'; // 진한 빨강
+        else if (change < 0) color = '#ef4444'; // 밝은 빨강
+        else color = '#475569'; // 보합
+      } else {
+        if (change >= 2) color = '#b91c1c'; // 진한 빨강
+        else if (change > 0) color = '#ef4444'; // 밝은 빨강
+        else if (change <= -2) color = '#1e3a8a'; // 진한 파랑
+        else if (change < 0) color = '#3b82f6'; // 밝은 파랑
+        else color = '#475569'; // 보합
+      }
       
-      quotes.forEach(q => {
-        const info = usStockTickers.find(t => t.ticker === q.symbol) || { name: q.shortName || q.symbol, exchange: q.fullExchangeName || 'NASDAQ' };
-        const price = q.regularMarketPrice || 0;
-        const changeRate = q.regularMarketChangePercent || 0;
-        const marketCap = q.marketCap || 0;
-        
-        const googleTicker = q.symbol.replace('-', '.');
-        
-        stocks.push({
-          code: q.symbol,
-          name: info.name,
-          market: info.exchange,
-          price: price,
-          highPrice: q.fiftyTwoWeekHigh || KNOWN_HIGH_PRICE_MAP[q.symbol] || 0,
-          changeRate: changeRate,
-          marketCapRaw: marketCap,
-          marketCapFormatted: formatCapUsd(marketCap),
-          sector: resolveStockSector(q.symbol, 'US'),
-          link: `https://www.google.com/finance/quote/${googleTicker}:${info.exchange}`
-        });
+      const fsize = idx < 2 ? 18 : (idx < 5 ? 14 : 11);
+      let name = (s.name || '').replace(/["']/g, '');
+      if (name.length > 7) name = name.slice(0, 6) + '..';
+      const label = `${name}\\n${sign}${change.toFixed(1)}%`;
+      
+      // 시가총액 기반 면적 가중치 계산
+      let capNum = (typeof s.marketCapRaw === 'number' && s.marketCapRaw > 0) ? s.marketCapRaw : 1000;
+      if (isUs && capNum > 1000000000) capNum = Math.round(capNum / 1000000000);
+      else if (capNum > 10000) capNum = Math.round(capNum / 10000);
+      const area = Math.max(capNum, 10);
+      
+      return `n${idx}[label="${label}",area=${area},fillcolor="${color}",fontsize=${fsize}]`;
+    }).join(';');
+    
+    const title = isUs ? '미국 증시 주요 종목 히트맵' : (marketType === 'KOSDAK' ? '코스닥 시가총액 히트맵' : '코스피 시가총액 히트맵');
+    const dot = `graph{layout=patchwork;bgcolor="#0b0f19";pad=0.2;label="${title}";labelloc=t;fontname="NanumGothic, Arial, sans-serif";fontcolor=white;fontsize=16;node[style="filled,rounded",shape=box,fontname="NanumGothic, Arial, sans-serif",fontcolor=white,color="#1e293b",penwidth=1.5];${nodes};}`;
+    
+    return `https://quickchart.io/graphviz?format=png&width=${width}&height=${height}&graph=` + encodeURIComponent(dot);
+  } catch (e) {
+    Logger.log('generateMarketHeatmapUrl warning: ' + e.toString());
+    return null;
+  }
+}
+
+function fetchUsMarketData(topN) {
+  const targetCount = parseInt(topN, 10) || 20;
+  const pageSize = Math.max(targetCount, 20);
+
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*'
+  };
+
+  try {
+    // 1. 네이버 증권 해외 증시(NASDAQ, NYSE) 시가총액 상위 종목 병렬 호출
+    const requests = [
+      {
+        url: `https://api.stock.naver.com/stock/exchange/NASDAQ/marketValue?page=1&pageSize=${pageSize}`,
+        headers: headers,
+        muteHttpExceptions: true
+      },
+      {
+        url: `https://api.stock.naver.com/stock/exchange/NYSE/marketValue?page=1&pageSize=${pageSize}`,
+        headers: headers,
+        muteHttpExceptions: true
+      }
+    ];
+
+    const responses = UrlFetchApp.fetchAll(requests);
+    let rawStocks = [];
+
+    responses.forEach(res => {
+      if (res && res.getResponseCode() === 200) {
+        try {
+          const data = JSON.parse(res.getContentText());
+          if (data && Array.isArray(data.stocks)) {
+            rawStocks = rawStocks.concat(data.stocks);
+          }
+        } catch (pe) {
+          Logger.log('fetchUsMarketData JSON parse warning: ' + pe.toString());
+        }
+      }
+    });
+
+    if (rawStocks.length === 0) {
+      Logger.log('fetchUsMarketData: Naver API empty, fallback to mock data');
+      return getFallbackUsData(targetCount);
+    }
+
+    // 2. 종목 데이터 정규화 및 중복 제거
+    const stockMap = new Map();
+    rawStocks.forEach(item => {
+      const code = item.symbolCode || (item.reutersCode ? item.reutersCode.split('.')[0] : '');
+      if (!code || stockMap.has(code)) return;
+
+      const price = parseFloat((item.closePriceRaw || item.closePrice || '0').toString().replace(/,/g, '')) || 0;
+      const changeRate = parseFloat((item.fluctuationsRatioRaw || item.fluctuationsRatio || '0').toString().replace(/,/g, '')) || 0;
+      const capRaw = parseFloat((item.marketValueRaw || '0').toString().replace(/,/g, '')) || 0;
+      const exchangeName = (item.stockExchangeType && item.stockExchangeType.name) ? item.stockExchangeType.name : 'US';
+      const sector = (item.industryCodeType && item.industryCodeType.industryGroupKor) 
+        ? item.industryCodeType.industryGroupKor 
+        : resolveStockSector(code, 'US');
+
+      const reuters = item.reutersCode || (code + (exchangeName === 'NASDAQ' ? '.O' : '.N'));
+      const name = item.stockName || item.stockNameEng || code;
+
+      stockMap.set(code, {
+        code: code,
+        reutersCode: reuters,
+        name: name,
+        market: exchangeName,
+        price: price,
+        highPrice: KNOWN_HIGH_PRICE_MAP[code] || 0,
+        changeRate: changeRate,
+        marketCapRaw: capRaw,
+        marketCapFormatted: formatCapUsd(capRaw),
+        sector: sector,
+        link: `https://m.stock.naver.com/worldstock/stock/${reuters}`
       });
-    }
-    
-    if (stocks.length === 0) {
-      stocks = getFallbackUsData(topN, usStockTickers);
-    }
-    
-    stocks.sort((a, b) => b.marketCapRaw - a.marketCapRaw);
-    const selected = stocks.slice(0, topN);
+    });
+
+    const stockList = Array.from(stockMap.values());
+    // 3. 미국 전체 시가총액 기준 내림차순 정렬
+    stockList.sort((a, b) => b.marketCapRaw - a.marketCapRaw);
+
+    // 4. 사용자가 설정한 Top N 종목 수만큼 정확하게 반영
+    const selected = stockList.slice(0, targetCount);
     selected.forEach((stock, idx) => {
       stock.currentRank = idx + 1;
       if (!stock.sector) {
         stock.sector = resolveStockSector(stock.code, 'US');
       }
     });
-    
+
     return selected;
   } catch (err) {
     Logger.log('fetchUsMarketData Error: ' + err.toString());
-    return getFallbackUsData(topN, usStockTickers);
+    return getFallbackUsData(targetCount);
   }
 }
 
@@ -1617,15 +1774,15 @@ function fetchUsMarketData(topN) {
 function enrichStockHighPrices(stockList) {
   if (!stockList || stockList.length === 0) return stockList;
 
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*'
+  };
+
   // 1. 국내 종목 대상 실시간 52주 최고가 병렬 배치 수집
   const domesticStocks = stockList.filter(s => (s.market === 'KOSPI' || s.market === 'KOSDAK'));
   if (domesticStocks.length > 0) {
     try {
-      const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*'
-      };
-
       const requests = domesticStocks.map(s => ({
         url: `https://m.stock.naver.com/api/stock/${s.code}/integration`,
         headers: headers,
@@ -1652,11 +1809,45 @@ function enrichStockHighPrices(stockList) {
         }
       });
     } catch (batchErr) {
-      Logger.log('enrichStockHighPrices batch fetch warning: ' + batchErr.toString());
+      Logger.log('enrichStockHighPrices domestic batch fetch warning: ' + batchErr.toString());
     }
   }
 
-  // 2. 종목별 고점 fallback 및 highDiffRate 산출
+  // 2. 해외(미국) 종목 대상 실시간 52주 최고가 병렬 배치 수집
+  const usStocks = stockList.filter(s => (s.market === 'NASDAQ' || s.market === 'NYSE'));
+  if (usStocks.length > 0) {
+    try {
+      const requests = usStocks.map(s => ({
+        url: `https://api.stock.naver.com/stock/${s.reutersCode || (s.code + '.O')}/basic`,
+        headers: headers,
+        muteHttpExceptions: true
+      }));
+
+      const responses = UrlFetchApp.fetchAll(requests);
+      responses.forEach((res, idx) => {
+        if (res && res.getResponseCode() === 200) {
+          try {
+            const data = JSON.parse(res.getContentText());
+            if (data.stockItemTotalInfos && Array.isArray(data.stockItemTotalInfos)) {
+              const highInfo = data.stockItemTotalInfos.find(info => info.code === 'highPriceOf52Weeks');
+              if (highInfo && highInfo.value) {
+                const parsedVal = parseFloat(highInfo.value.toString().replace(/,/g, ''));
+                if (!isNaN(parsedVal) && parsedVal > 0) {
+                  usStocks[idx].highPrice = parsedVal;
+                }
+              }
+            }
+          } catch (e) {
+            // 개별 종목 파싱 실패 시 fallback 유지
+          }
+        }
+      });
+    } catch (usBatchErr) {
+      Logger.log('enrichStockHighPrices US batch fetch warning: ' + usBatchErr.toString());
+    }
+  }
+
+  // 3. 종목별 고점 fallback 및 highDiffRate 산출
   stockList.forEach(stock => {
     // 1차 fallback: KNOWN_HIGH_PRICE_MAP
     if (!stock.highPrice || stock.highPrice <= 0) {
@@ -1667,7 +1858,7 @@ function enrichStockHighPrices(stockList) {
 
     // 2차 fallback: 현재가 기준 안전 추정치
     if (!stock.highPrice || stock.highPrice <= 0) {
-      stock.highPrice = Math.max(stock.price, Math.round(stock.price * 1.25));
+      stock.highPrice = Math.max(stock.price, Math.round(stock.price * 1.25 * 100) / 100);
     }
 
     // 고점 대비 현재가 등락률: ((현재가 - 최고가) / 최고가) * 100
@@ -1770,16 +1961,71 @@ function calculateHistoricalChanges(stockList, config) {
 // 6. 텔레그램 메시지 포맷팅 Engine (`parse_mode: 'HTML'`)
 // ============================================================================
 
-function generateReportHtml(sessionTitle, stockList, config) {
-  const nowStr = formatDate(new Date());
-  let html = `<b>${sessionTitle}</b>\n`;
-  html += `🗓 <b>기준 일시:</b> ${nowStr}\n`;
-  html += `📊 <b>조회 범위:</b> 상위 ${stockList.length}개 종목\n`;
-  html += `📌 <b>순위 변동:</b> ▲ 상승 | ▼ 하락 | ➖ 유지\n`;
-  if (config.showIcons) {
-    html += `📌 <b>강조 아이콘:</b> 🚀 10계단+ 급등 | 🔥 5계단+ 상승 | 🚨 10계단+ 급락\n`;
+function generateReportSections(sessionTitle, stockList, config, marketIndices) {
+  const now = new Date();
+  const nowStr = formatDate(now);
+  let holidayNote = '';
+  if (marketIndices && (marketIndices.targetMarket === 'KOSPI' || marketIndices.targetMarket === 'KOSDAK')) {
+    const krxCheck = isKrxHoliday(now);
+    if (krxCheck.isHoliday) {
+      holidayNote = ` <i>(휴장일: ${krxCheck.reason} · 최근 거래일 마감 기준)</i>`;
+    }
+  } else if (marketIndices && marketIndices.targetMarket === 'US') {
+    const usCheck = isUsHoliday(now);
+    if (usCheck.isHoliday) {
+      holidayNote = ` <i>(미국 휴장: ${usCheck.reason} · 최근 거래일 마감 기준)</i>`;
+    }
   }
-  html += `───────────────────\n\n`;
+
+  let headerHtml = `<b>${sessionTitle}</b>\n`;
+  headerHtml += `🗓 <b>기준 일시:</b> ${nowStr}${holidayNote}\n\n`;
+
+  // 최상단 증시 시황(지수 변동값 및 등락률) 표기
+  if (marketIndices) {
+    let indexSection = '';
+    if (marketIndices.targetMarket === 'KOSPI' && marketIndices.kospi) {
+      const k = marketIndices.kospi;
+      const chgVal = parseFloat((k.change || '0').toString().replace(/,/g, ''));
+      const sign = chgVal > 0 ? '+' : '';
+      const icon = chgVal > 0 ? '🔺' : chgVal < 0 ? '🔻' : '➖';
+      indexSection += `📈 <b>코스피 종합 시황</b>\n`;
+      indexSection += `  └ <b>지수:</b> ${k.price} pt | ${icon} <b>${sign}${k.change} pt (${sign}${k.rate}%)</b>\n\n`;
+    } else if (marketIndices.targetMarket === 'KOSDAK' && marketIndices.kosdak) {
+      const k = marketIndices.kosdak;
+      const chgVal = parseFloat((k.change || '0').toString().replace(/,/g, ''));
+      const sign = chgVal > 0 ? '+' : '';
+      const icon = chgVal > 0 ? '🔺' : chgVal < 0 ? '🔻' : '➖';
+      indexSection += `📈 <b>코스닥 종합 시황</b>\n`;
+      indexSection += `  └ <b>지수:</b> ${k.price} pt | ${icon} <b>${sign}${k.change} pt (${sign}${k.rate}%)</b>\n\n`;
+    } else if (marketIndices.targetMarket === 'US' && (marketIndices.nasdaq || marketIndices.spx)) {
+      indexSection += `📈 <b>미국 주요 지수 시황</b>\n`;
+      if (marketIndices.nasdaq) {
+        const n = marketIndices.nasdaq;
+        const chgVal = parseFloat((n.change || '0').toString().replace(/,/g, ''));
+        const sign = chgVal > 0 ? '+' : '';
+        const icon = chgVal > 0 ? '🔺' : chgVal < 0 ? '🔻' : '➖';
+        indexSection += `  └ <b>나스닥 종합:</b> ${n.price} pt | ${icon} <b>${sign}${n.change} pt (${sign}${n.rate}%)</b>\n`;
+      }
+      if (marketIndices.spx) {
+        const s = marketIndices.spx;
+        const chgVal = parseFloat((s.change || '0').toString().replace(/,/g, ''));
+        const sign = chgVal > 0 ? '+' : '';
+        const icon = chgVal > 0 ? '🔺' : chgVal < 0 ? '🔻' : '➖';
+        indexSection += `  └ <b>S&P 500:</b> ${s.price} pt | ${icon} <b>${sign}${s.change} pt (${sign}${s.rate}%)</b>\n`;
+      }
+      indexSection += `\n`;
+    }
+    if (indexSection) {
+      headerHtml += indexSection;
+    }
+  }
+
+  let bodyHtml = `📊 <b>조회 범위:</b> 상위 ${stockList.length}개 종목\n`;
+  bodyHtml += `📌 <b>순위 변동:</b> ▲ 상승 | ▼ 하락 | ➖ 유지\n`;
+  if (config.showIcons) {
+    bodyHtml += `📌 <b>강조 아이콘:</b> 🚀 10계단+ 급등 | 🔥 5계단+ 상승 | 🚨 10계단+ 급락\n`;
+  }
+  bodyHtml += `───────────────────\n\n`;
   
   stockList.forEach(stock => {
     let leadIconStr = (stock.leadIcon && config.showIcons) ? (stock.leadIcon + ' ') : '';
@@ -1792,7 +2038,7 @@ function generateReportHtml(sessionTitle, stockList, config) {
     }
     const sectorPart = (config.showSector && stock.sector) ? ` · ${escapeHtml(stock.sector)}` : '';
     titleLine += ` <code>(${stock.market}${sectorPart})</code>\n`;
-    html += titleLine;
+    bodyHtml += titleLine;
     
     const changeSymbol = stock.changeRate > 0 ? '🔺' : stock.changeRate < 0 ? '🔻' : '➖';
     const changeSign = stock.changeRate > 0 ? '+' : '';
@@ -1805,9 +2051,9 @@ function generateReportHtml(sessionTitle, stockList, config) {
       priceLine += `| ${changeSymbol} ${changeSign}${stock.changeRate.toFixed(2)}%`;
     }
     priceLine += `\n`;
-    html += priceLine;
+    bodyHtml += priceLine;
     
-    html += `  └ 시가총액: ${stock.marketCapFormatted}\n`;
+    bodyHtml += `  └ 시가총액: ${stock.marketCapFormatted}\n`;
 
     // config.showHighDiff 옵션 체크 시 최고점 대비 현재 등락률 (+,-%) 표기
     if (config.showHighDiff && stock.highPrice) {
@@ -1819,7 +2065,7 @@ function generateReportHtml(sessionTitle, stockList, config) {
         ? `${formatNumber(stock.highPrice)}원`
         : `$${stock.highPrice.toFixed(2)}`;
       
-      html += `  └ 고점 대비: ${highSign}${diffRate.toFixed(2)}% (최고 ${highPriceStr})\n`;
+      bodyHtml += `  └ 고점 대비: ${highSign}${diffRate.toFixed(2)}% (최고 ${highPriceStr})\n`;
     }
     
     const activeKeys = ['1d', '5d', '1m', '3m', '1y'].filter(k => config['compare' + k]);
@@ -1851,19 +2097,27 @@ function generateReportHtml(sessionTitle, stockList, config) {
       });
       
       compStr += parts.join(' | ') + `\n`;
-      html += compStr;
+      bodyHtml += compStr;
     }
     
-    html += `\n`;
+    bodyHtml += `\n`;
   });
   
   if (config.includeAnalystSummary) {
-    html += `───────────────────\n`;
-    html += `💡 <b>[선택 시점별 순위 급등/급락 핵심 요약]</b>\n`;
-    html += generateAnalystSummary(stockList, sessionTitle, config);
+    bodyHtml += `───────────────────\n`;
+    bodyHtml += `💡 <b>[선택 시점별 순위 급등/급락 핵심 요약]</b>\n`;
+    bodyHtml += generateAnalystSummary(stockList, sessionTitle, config);
   }
   
-  return html;
+  return {
+    headerHtml: headerHtml,
+    bodyHtml: bodyHtml
+  };
+}
+
+function generateReportHtml(sessionTitle, stockList, config, marketIndices) {
+  const sections = generateReportSections(sessionTitle, stockList, config, marketIndices);
+  return sections.headerHtml + sections.bodyHtml;
 }
 
 /**
@@ -1968,8 +2222,62 @@ function generateAnalystSummary(stockList, sessionTitle, config) {
   return summaryText + `\n`;
 }
 
-function sendTelegramMessage(config, htmlMessage) {
-  // 타깃 봇 목록 추출
+/**
+ * 텔레그램 공식 sendPhoto / sendMediaGroup API를 이용한 당일 지수 차트 사진 직접 전송 엔진
+ */
+function sendTelegramPhotos(token, chatId, photoUrls, caption) {
+  if (!photoUrls || photoUrls.length === 0) return { ok: true };
+
+  try {
+    if (photoUrls.length === 1) {
+      const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+      const payload = {
+        chat_id: chatId,
+        photo: photoUrls[0],
+        caption: caption || '',
+        parse_mode: 'HTML'
+      };
+      const res = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      return JSON.parse(res.getContentText());
+    } else {
+      // 2장 이상일 경우 sendMediaGroup으로 깔끔한 묶음 사진 앨범 전송 (나스닥 & S&P 500)
+      const url = `https://api.telegram.org/bot${token}/sendMediaGroup`;
+      const media = photoUrls.map((p, idx) => ({
+        type: 'photo',
+        media: p,
+        caption: idx === 0 ? (caption || '') : '',
+        parse_mode: 'HTML'
+      }));
+      const payload = {
+        chat_id: chatId,
+        media: media
+      };
+      const res = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      return JSON.parse(res.getContentText());
+    }
+  } catch (err) {
+    Logger.log('sendTelegramPhotos error: ' + err.toString());
+    return { ok: false, description: err.toString() };
+  }
+}
+
+/**
+ * 3단계 순차 전송 엔진:
+ * 1. [리포트 헤더 & 지수 종합 시황 정보] 텍스트 발송
+ * 2. [네이버 공식 지수 차트 이미지] 사진(Photo/Album) 발송 (시황 바로 아래 위치)
+ * 3. [시총 상위 종목 분석 & 애널리스트 요약] 리포트 본문 발송 (4000자 분할 지원)
+ */
+function sendTelegramReportWithPhotos(config, headerHtml, photoUrls, photoCaption, bodyHtml) {
   let targetBots = [];
   if (Array.isArray(config.telegramBots) && config.telegramBots.length > 0) {
     targetBots = config.telegramBots.filter(b => b.enabled !== false && b.token && b.chatId);
@@ -1986,27 +2294,52 @@ function sendTelegramMessage(config, htmlMessage) {
     return { success: false, message: '활성화된 텔레그램 봇(Bot Token 및 Chat ID)이 등록되어 있지 않습니다.' };
   }
   
-  const chunks = splitHtmlMessage(htmlMessage, 4000);
+  const bodyChunks = splitHtmlMessage(bodyHtml, 4000);
   let successCount = 0;
   let failCount = 0;
   const errors = [];
   
+  // 텔레그램 이미지 캐싱 방지를 위해 timestamp 파라미터 부착 (매 발송마다 최신 차트 로드 보장)
+  const cacheBustedPhotos = (photoUrls || []).map(url => {
+    if (!url) return url;
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}t=${new Date().getTime()}`;
+  });
+
   targetBots.forEach(bot => {
     let botAllSuccess = true;
     let botLastError = '';
-    
-    chunks.forEach((chunk, index) => {
+
+    // 1단계: [리포트 헤더 & 지수 종합 시황 정보] 발송
+    if (headerHtml && headerHtml.trim().length > 0) {
+      const headerRes = sendTelegramRaw(bot.token, bot.chatId, headerHtml.trim());
+      if (!headerRes.ok) {
+        botAllSuccess = false;
+        botLastError = headerRes.description || 'Header Send Error';
+      }
+    }
+
+    // 2단계: [시황 바로 밑 공식 차트 이미지 사진] 발송 (네이버 공식 지수 차트)
+    if (cacheBustedPhotos && cacheBustedPhotos.length > 0) {
+      const photoRes = sendTelegramPhotos(bot.token, bot.chatId, cacheBustedPhotos, photoCaption);
+      if (!photoRes.ok) {
+        Logger.log('Photo send warning for ' + bot.name + ': ' + (photoRes.description || 'unknown'));
+      }
+    }
+
+    // 3단계: [종목별 시가총액 순위 및 애널리스트 분석 요약] 본문 발송 (분할 지원)
+    bodyChunks.forEach((chunk, index) => {
       let payloadText = chunk;
-      if (chunks.length > 1) {
-        payloadText = `<b>[분할 리포트 ${index + 1}/${chunks.length}]</b>\n` + chunk;
+      if (bodyChunks.length > 1) {
+        payloadText = `<b>[분할 리포트 ${index + 1}/${bodyChunks.length}]</b>\n` + chunk;
       }
       const res = sendTelegramRaw(bot.token, bot.chatId, payloadText);
       if (!res.ok) {
         botAllSuccess = false;
-        botLastError = res.description || 'Telegram API Error';
+        botLastError = res.description || 'Body Chunk Send Error';
       }
     });
-    
+
     if (botAllSuccess) {
       successCount++;
     } else {
@@ -2014,7 +2347,7 @@ function sendTelegramMessage(config, htmlMessage) {
       errors.push(`${bot.name || '봇'}: ${botLastError}`);
     }
   });
-  
+
   const total = targetBots.length;
   if (failCount === 0) {
     return {
@@ -2036,13 +2369,18 @@ function sendTelegramMessage(config, htmlMessage) {
   }
 }
 
+function sendTelegramMessage(config, htmlMessage, photoUrls, photoCaption) {
+  // 레거시 호환용 wrapper
+  return sendTelegramReportWithPhotos(config, '', photoUrls, photoCaption, htmlMessage);
+}
+
 function sendTelegramRaw(token, chatId, htmlText) {
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   const payload = {
     chat_id: chatId,
     text: htmlText,
     parse_mode: 'HTML',
-    disable_web_page_preview: true
+    disable_web_page_preview: true // 요약 아래에 불필요한 웹 링크 미리보기가 붙지 않도록 차단
   };
   
   const options = {
@@ -2087,6 +2425,7 @@ function splitHtmlMessage(text, maxLength) {
 
 function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isManual) {
   const config = loadSettings();
+  const isHol = isKrxHoliday(new Date()).isHoliday;
   
   // 휴장일 자동 발송 제외 체크
   if (!isManual && config.skipHolidays) {
@@ -2104,18 +2443,44 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
   if (config.enableKospi) {
     const dataKospi = fetchKrxMarketData('KOSPI', config.topN);
     const processedKospi = calculateHistoricalChanges(dataKospi, config);
+    const indicesKospi = fetchMarketIndices('KOSPI');
     const titleKospi = `[${sessionEmoji} 국내 ${sessionLabel} - 코스피(KOSPI) 마감 시총 분석]`;
-    const htmlKospi = generateReportHtml(titleKospi, processedKospi, config);
-    results.push(sendTelegramMessage(config, htmlKospi));
+    const sectionsKospi = generateReportSections(titleKospi, processedKospi, config, indicesKospi);
+    
+    const photosKospi = [];
+    if (indicesKospi && indicesKospi.kospi && indicesKospi.kospi.chartUrl) {
+      photosKospi.push(indicesKospi.kospi.chartUrl);
+    }
+    if (config.enableHeatmap !== false) {
+      const heatmapKospi = generateMarketHeatmapUrl(processedKospi, 'KOSPI');
+      if (heatmapKospi) photosKospi.push(heatmapKospi);
+    }
+    const captionKospi = isHol 
+      ? `📊 코스피(KOSPI) 최근 거래일 마감 공식 흐름 차트 & 시총 히트맵` 
+      : `📊 코스피(KOSPI) 당일 공식 흐름 차트 & 시총 히트맵`;
+    results.push(sendTelegramReportWithPhotos(config, sectionsKospi.headerHtml, photosKospi, captionKospi, sectionsKospi.bodyHtml));
   }
   
   // 2. 코스닥 리포트 발송 (활성화된 경우)
   if (config.enableKosdak) {
     const dataKosdak = fetchKrxMarketData('KOSDAK', config.topN);
     const processedKosdak = calculateHistoricalChanges(dataKosdak, config);
+    const indicesKosdak = fetchMarketIndices('KOSDAK');
     const titleKosdak = `[${sessionEmoji} 국내 ${sessionLabel} - 코스닥(KOSDAK) 마감 시총 분석]`;
-    const htmlKosdak = generateReportHtml(titleKosdak, processedKosdak, config);
-    results.push(sendTelegramMessage(config, htmlKosdak));
+    const sectionsKosdak = generateReportSections(titleKosdak, processedKosdak, config, indicesKosdak);
+    
+    const photosKosdak = [];
+    if (indicesKosdak && indicesKosdak.kosdak && indicesKosdak.kosdak.chartUrl) {
+      photosKosdak.push(indicesKosdak.kosdak.chartUrl);
+    }
+    if (config.enableHeatmap !== false) {
+      const heatmapKosdak = generateMarketHeatmapUrl(processedKosdak, 'KOSDAK');
+      if (heatmapKosdak) photosKosdak.push(heatmapKosdak);
+    }
+    const captionKosdak = isHol 
+      ? `📊 코스닥(KOSDAQ) 최근 거래일 마감 공식 흐름 차트 & 시총 히트맵` 
+      : `📊 코스닥(KOSDAQ) 당일 공식 흐름 차트 & 시총 히트맵`;
+    results.push(sendTelegramReportWithPhotos(config, sectionsKosdak.headerHtml, photosKosdak, captionKosdak, sectionsKosdak.bodyHtml));
   }
   
   if (results.length === 0) {
@@ -2146,6 +2511,7 @@ function sendKrxNxtReport() {
 
 function sendUsReport() {
   const config = loadSettings();
+  const isUsHol = isUsHoliday(new Date()).isHoliday;
   
   // 휴장일 자동 발송 제외 체크
   if (config.skipHolidays) {
@@ -2159,8 +2525,22 @@ function sendUsReport() {
 
   const data = fetchUsMarketData(config.topN);
   const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[🇺🇸 미국 증시 마감 시총 분석]', processed, config);
-  return sendTelegramMessage(config, html);
+  const indicesUs = fetchMarketIndices('US');
+  const titleUs = '[🇺🇸 미국 증시 마감 시총 분석]';
+  const sectionsUs = generateReportSections(titleUs, processed, config, indicesUs);
+
+  const photosUs = [];
+  if (indicesUs && indicesUs.nasdaq && indicesUs.nasdaq.chartUrl) photosUs.push(indicesUs.nasdaq.chartUrl);
+  if (indicesUs && indicesUs.spx && indicesUs.spx.chartUrl) photosUs.push(indicesUs.spx.chartUrl);
+  if (config.enableHeatmap !== false) {
+    const heatmapUs = generateMarketHeatmapUrl(processed, 'US');
+    if (heatmapUs) photosUs.push(heatmapUs);
+  }
+  const captionUs = isUsHol 
+    ? '📊 미국 증시 최근 거래일 마감 공식 흐름 차트(나스닥/S&P 500) & 시총 히트맵' 
+    : '📊 미국 증시 당일 공식 흐름 차트(나스닥/S&P 500) & 시총 히트맵';
+
+  return sendTelegramReportWithPhotos(config, sectionsUs.headerHtml, photosUs, captionUs, sectionsUs.bodyHtml);
 }
 
 // 수동 즉시 발송 함수 (대시보드 UI 테스트용 - 휴장일이라도 강제 전송)
@@ -2182,10 +2562,25 @@ function sendManualKrxNxtReport() {
 
 function sendManualUsReport() {
   const config = loadSettings();
+  const isUsHol = isUsHoliday(new Date()).isHoliday;
   const data = fetchUsMarketData(config.topN);
   const processed = calculateHistoricalChanges(data, config);
-  const html = generateReportHtml('[🇺🇸 미국 증시 마감 시총 분석]', processed, config);
-  return sendTelegramMessage(config, html);
+  const indicesUs = fetchMarketIndices('US');
+  const titleUs = '[🇺🇸 미국 증시 마감 시총 분석]';
+  const sectionsUs = generateReportSections(titleUs, processed, config, indicesUs);
+
+  const photosUs = [];
+  if (indicesUs && indicesUs.nasdaq && indicesUs.nasdaq.chartUrl) photosUs.push(indicesUs.nasdaq.chartUrl);
+  if (indicesUs && indicesUs.spx && indicesUs.spx.chartUrl) photosUs.push(indicesUs.spx.chartUrl);
+  if (config.enableHeatmap !== false) {
+    const heatmapUs = generateMarketHeatmapUrl(processed, 'US');
+    if (heatmapUs) photosUs.push(heatmapUs);
+  }
+  const captionUs = isUsHol 
+    ? '📊 미국 증시 최근 거래일 마감 공식 흐름 차트(나스닥/S&P 500) & 시총 히트맵' 
+    : '📊 미국 증시 당일 공식 흐름 차트(나스닥/S&P 500) & 시총 히트맵';
+
+  return sendTelegramReportWithPhotos(config, sectionsUs.headerHtml, photosUs, captionUs, sectionsUs.bodyHtml);
 }
 
 function formatDate(date) {
@@ -2279,12 +2674,28 @@ function getFallbackKrxData(topN, marketType) {
 }
 
 function getFallbackUsData(topN, tickers) {
+  const targetCount = parseInt(topN, 10) || 20;
   const mockMap = [
-    { code: 'NVDA', name: 'NVIDIA', market: 'NASDAQ', price: 128.50, highPrice: 140.76, changeRate: 4.15, marketCapRaw: 3150000000000, marketCapFormatted: '$3.15T', sector: '반도체 / AI', link: 'https://www.google.com/finance/quote/NVDA:NASDAQ' },
-    { code: 'AAPL', name: 'Apple', market: 'NASDAQ', price: 224.20, highPrice: 237.23, changeRate: 1.10, marketCapRaw: 3420000000000, marketCapFormatted: '$3.42T', sector: 'IT 하드웨어', link: 'https://www.google.com/finance/quote/AAPL:NASDAQ' },
-    { code: 'MSFT', name: 'Microsoft', market: 'NASDAQ', price: 448.90, highPrice: 468.35, changeRate: 0.85, marketCapRaw: 3330000000000, marketCapFormatted: '$3.33T', sector: '소프트웨어 / 클라우드', link: 'https://www.google.com/finance/quote/MSFT:NASDAQ' },
-    { code: 'GOOGL', name: 'Alphabet A', market: 'NASDAQ', price: 182.30, highPrice: 193.31, changeRate: -0.45, marketCapRaw: 2260000000000, marketCapFormatted: '$2.26T', sector: '인터넷 / 검색', link: 'https://www.google.com/finance/quote/GOOGL:NASDAQ' },
-    { code: 'AMZN', name: 'Amazon', market: 'NASDAQ', price: 186.50, highPrice: 201.20, changeRate: 1.65, marketCapRaw: 1940000000000, marketCapFormatted: '$1.94T', sector: '전자상거래 / 클라우드', link: 'https://www.google.com/finance/quote/AMZN:NASDAQ' }
+    { code: 'NVDA', name: '엔비디아', market: 'NASDAQ', price: 230.48, highPrice: 243.37, changeRate: -2.94, marketCapRaw: 5554568000000, marketCapFormatted: '$5.55T', sector: '반도체', link: 'https://m.stock.naver.com/worldstock/stock/NVDA.O' },
+    { code: 'AAPL', name: '애플', market: 'NASDAQ', price: 340.42, highPrice: 345.80, changeRate: 1.11, marketCapRaw: 4968150000000, marketCapFormatted: '$4.97T', sector: '컴퓨터, 전화 및 가전제품', link: 'https://m.stock.naver.com/worldstock/stock/AAPL.O' },
+    { code: 'MSFT', name: '마이크로소프트', market: 'NASDAQ', price: 522.61, highPrice: 555.45, changeRate: -1.35, marketCapRaw: 3880664000000, marketCapFormatted: '$3.88T', sector: '소프트웨어 및 IT 서비스', link: 'https://m.stock.naver.com/worldstock/stock/MSFT.O' },
+    { code: 'AMZN', name: '아마존닷컴', market: 'NASDAQ', price: 254.06, highPrice: 260.10, changeRate: -2.25, marketCapRaw: 2740370000000, marketCapFormatted: '$2.74T', sector: '다양한 소매업', link: 'https://m.stock.naver.com/worldstock/stock/AMZN.O' },
+    { code: 'TSM', name: 'TSMC ADR', market: 'NYSE', price: 457.99, highPrice: 470.00, changeRate: -3.01, marketCapRaw: 2375400000000, marketCapFormatted: '$2.38T', sector: '반도체', link: 'https://m.stock.naver.com/worldstock/stock/TSM.N' },
+    { code: 'GOOGL', name: '알파벳 Class A', market: 'NASDAQ', price: 348.29, highPrice: 355.00, changeRate: -0.63, marketCapRaw: 2334587000000, marketCapFormatted: '$2.33T', sector: '소프트웨어 및 IT 서비스', link: 'https://m.stock.naver.com/worldstock/stock/GOOGL.O' },
+    { code: 'META', name: '메타', market: 'NASDAQ', price: 720.89, highPrice: 740.00, changeRate: -0.06, marketCapRaw: 1836471000000, marketCapFormatted: '$1.84T', sector: '소프트웨어 및 IT 서비스', link: 'https://m.stock.naver.com/worldstock/stock/META.O' },
+    { code: 'AVGO', name: '브로드컴', market: 'NASDAQ', price: 360.14, highPrice: 385.00, changeRate: -4.35, marketCapRaw: 1719175000000, marketCapFormatted: '$1.72T', sector: '반도체', link: 'https://m.stock.naver.com/worldstock/stock/AVGO.O' },
+    { code: 'TSLA', name: '테슬라', market: 'NASDAQ', price: 375.00, highPrice: 488.54, changeRate: -0.74, marketCapRaw: 1481080000000, marketCapFormatted: '$1.48T', sector: '자동차 및 부품', link: 'https://m.stock.naver.com/worldstock/stock/TSLA.O' },
+    { code: 'LLY', name: '일라이 릴리', market: 'NYSE', price: 1169.60, highPrice: 1200.00, changeRate: -1.61, marketCapRaw: 1101000000000, marketCapFormatted: '$1.10T', sector: '제약', link: 'https://m.stock.naver.com/worldstock/stock/LLY.N' },
+    { code: 'JPM', name: '제이피모간체이스', market: 'NYSE', price: 331.42, highPrice: 340.00, changeRate: 0.56, marketCapRaw: 881000000000, marketCapFormatted: '$881.00B', sector: '은행', link: 'https://m.stock.naver.com/worldstock/stock/JPM.N' },
+    { code: 'BRK B', name: '버크셔 해서웨이 Class B', market: 'NYSE', price: 511.05, highPrice: 525.00, changeRate: 0.95, marketCapRaw: 719600000000, marketCapFormatted: '$719.60B', sector: '투자회사', link: 'https://m.stock.naver.com/worldstock/stock/BRK_B.N' },
+    { code: 'V', name: '비자', market: 'NYSE', price: 375.10, highPrice: 385.00, changeRate: 0.81, marketCapRaw: 700300000000, marketCapFormatted: '$700.30B', sector: '금융서비스', link: 'https://m.stock.naver.com/worldstock/stock/V.N' },
+    { code: 'WMT', name: '월마트', market: 'NYSE', price: 105.20, highPrice: 108.00, changeRate: 0.45, marketCapRaw: 685000000000, marketCapFormatted: '$685.00B', sector: '할인점', link: 'https://m.stock.naver.com/worldstock/stock/WMT.N' },
+    { code: 'UNH', name: '유나이티드헬스', market: 'NYSE', price: 590.10, highPrice: 610.00, changeRate: -0.30, marketCapRaw: 540000000000, marketCapFormatted: '$540.00B', sector: '의료서비스', link: 'https://m.stock.naver.com/worldstock/stock/UNH.N' },
+    { code: 'MA', name: '마스터카드', market: 'NYSE', price: 520.40, highPrice: 535.00, changeRate: 0.72, marketCapRaw: 480000000000, marketCapFormatted: '$480.00B', sector: '금융서비스', link: 'https://m.stock.naver.com/worldstock/stock/MA.N' },
+    { code: 'XOM', name: '엑손모빌', market: 'NYSE', price: 122.50, highPrice: 125.00, changeRate: -1.15, marketCapRaw: 470000000000, marketCapFormatted: '$470.00B', sector: '에너지', link: 'https://m.stock.naver.com/worldstock/stock/XOM.N' },
+    { code: 'COST', name: '코스트코 홀세일', market: 'NASDAQ', price: 947.92, highPrice: 955.00, changeRate: 0.60, marketCapRaw: 420051000000, marketCapFormatted: '$420.05B', sector: '할인점', link: 'https://m.stock.naver.com/worldstock/stock/COST.O' },
+    { code: 'AMAT', name: '어플라이드 머티어리얼즈', market: 'NASDAQ', price: 509.57, highPrice: 530.00, changeRate: -2.13, marketCapRaw: 404393000000, marketCapFormatted: '$404.39B', sector: '반도체 장비', link: 'https://m.stock.naver.com/worldstock/stock/AMAT.O' },
+    { code: 'HD', name: '홈디포', market: 'NYSE', price: 410.20, highPrice: 420.00, changeRate: 0.35, marketCapRaw: 401000000000, marketCapFormatted: '$401.00B', sector: '소매업', link: 'https://m.stock.naver.com/worldstock/stock/HD.N' }
   ];
-  return mockMap.slice(0, topN);
+  return mockMap.slice(0, targetCount);
 }
