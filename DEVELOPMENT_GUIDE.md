@@ -207,7 +207,7 @@ flowchart TD
 
 ---
 
-## 5. ⏰ 서머타임(DST) 판별 및 스케줄링 디버깅
+## 5. ⏰ 스케줄링 & 📊 공식 지수 차트 / 고해상도 시황 히트맵 엔진
 
 ### 1) 미국 서머타임(DST) 판별 알고리즘 (`isUsDst`)
 - 미국 동부 시간대(ET) 3월 2번째 일요일 02:00 ~ 11월 1번째 일요일 02:00 구간을 판별합니다.
@@ -215,23 +215,48 @@ flowchart TD
   - **EST (표준시)**: 미국 마감 16:00 EST = KST 다음날 **06:00** $\rightarrow$ 발송 트리거: **06:05 KST**
 - 매일 새벽 01:00 KST에 `dailyTriggerCheck` 함수가 실행되어 서머타임 전환 시점 당일에 자동으로 트리거 시각을 재설정합니다.
 
----
+### 2) 최상단 지수 종합 시황 수집 엔진 (`fetchMarketIndices`)
+- **수집 대상**:
+  - 국내 증시: 코스피(`KOSPI`), 코스닥(`KOSDAQ`)
+  - 미국 증시: 나스닥 종합(`NAS@IXIC`), S&P 500(`SPI@SPX`) (사용자 요구사항에 따라 다우존스 제외)
+- **데이터 엔드포인트**:
+  - `https://m.stock.naver.com/api/index/{code}/basic`
+- **산출 필드**:
+  - `closePrice`: 현재/마감 지수
+  - `compareToPreviousClosePrice`: 전일 대비 변동값 (`+`, `-`)
+  - `fluctuationsRatio`: 등락률 (`%`)
+- **출력 서식**:
+  - 리포트 헤더 바로 아래에 `📈 [종합 시황 지수]` 블록으로 우선 노출하여, 세부 종목 확인 전 시장 흐름을 즉시 파악 가능.
 
-### 4) 📊 공식 시장 지수 차트 & 시가총액 히트맵(트리맵) 엔진
-1. **네이버 증권 공식 지수 차트**:
-   - 코스피: `https://ssl.pstatic.net/imgfinance/chart/main/KOSPI.png`
-   - 코스닥: `https://ssl.pstatic.net/imgfinance/chart/main/KOSDAQ.png`
-   - 나스닥 종합: `https://ssl.pstatic.net/imgfinance/chart/world/continent/NAS@IXIC.png`
-   - S&P 500: `https://ssl.pstatic.net/imgfinance/chart/world/continent/SPI@SPX.png`
-   - **텔레그램 캐시 방지**: URL 뒤에 `?t=${Date.now()}` 실시간 타임스탬프를 동적 부착하여, 텔레그램 서버가 항상 최신 마감 차트를 새로 로드하도록 보장합니다.
-2. **시가총액 비율 기반 히트맵(트리맵) 이미지**:
-   - `generateMarketHeatmapUrl(stockList, marketType)`: QuickChart Graphviz의 `patchwork` 알고리즘을 활용하여 상위 종목의 시가총액에 비례하는 사각형 면적(`area`)과 당일 등락률 기반 색상 코딩을 동적 생성합니다.
-   - 국내 증시: 상승=빨강, 하락=파랑
-   - 미국 증시: 상승=초록, 하락=빨강
-3. **3단계 순차 전송 파이프라인(`sendTelegramReportWithPhotos`)**:
-   - **1단계**: [리포트 헤더 & 지수 종합 시황] 텍스트 발송
-   - **2단계**: [네이버 공식 차트 + 시총 히트맵] 사진 앨범(`sendMediaGroup`) 발송 (시황 바로 아래 위치)
-   - **3단계**: [종목별 시총 순위 분석 & 애널리스트 요약] 본문 텍스트 발송
+### 3) 네이버 증권 공식 지수 차트 실시간 연동
+- **공식 차트 엔드포인트**:
+  - 코스피: `https://ssl.pstatic.net/imgfinance/chart/main/KOSPI.png`
+  - 코스닥: `https://ssl.pstatic.net/imgfinance/chart/main/KOSDAQ.png`
+  - 나스닥 종합: `https://ssl.pstatic.net/imgfinance/chart/world/continent/NAS@IXIC.png`
+  - S&P 500: `https://ssl.pstatic.net/imgfinance/chart/world/continent/SPI@SPX.png`
+- **캐시 방지 메커니즘**:
+  - 텔레그램 서버는 동일 이미지 URL에 대해 강한 캐시를 적용하므로, URL 파라미터에 `?t=${Date.now()}` 실시간 타임스탬프를 동적으로 부여하여 최신 마감 차트 이미지를 새로 가져오도록 보장합니다.
+
+### 4) 전체 시황 업종별 고해상도 히트맵(트리맵) 엔진 (`generateMarketHeatmapUrl`)
+- **전체 시황 주도 업종 매핑**:
+  - 단순 상위 10개 종목이 아닌, 증시 전체를 조망할 수 있는 **10대 핵심 주도 업종(섹터)**을 추출합니다.
+  - 국내: 네이버 업종별 전체 시황 API(`https://m.stock.naver.com/api/stocks/industry?page=1&pageSize=100`) 연동 (`groups` 중 시총/종목수 상위 10개 업종).
+  - 미국: 시장 전체 가중치 합산 기반 상위 10개 대표 섹터.
+- **초고해상도(1200x800 HD) 및 텍스트 열화 방지**:
+  - QuickChart Graphviz의 `patchwork` 레이아웃을 사용하며, 해상도를 **1200x800**으로 지정하여 모바일 전체화면 확대 시에도 선명한 화질을 유지합니다.
+  - **폰트 크기 계층화**: 상위 1~2위 주도 업종 **26pt**, 3~5위 **22pt**, 6~10위 **18pt** (타이틀 **24pt**).
+  - **업종명 스마트 정제 (`cleanSectorHeatmapName`)**: 긴 업종명을 직관적 명칭(`반도체와반도체장비` $\rightarrow$ `반도체`, `디스플레이장비및부품` $\rightarrow$ `디스플레이`, `건강관리장비와용품` $\rightarrow$ `헬스케어/의료`, `소프트웨어 및 IT 서비스` $\rightarrow$ `소프트웨어/IT`)으로 변환하여 말줄임 깨짐을 방지하고 2줄 레이블(`[업종명]\n[+X.X%]`)로 깔끔히 배치합니다.
+- **컬러 코딩 규칙**:
+  - 국내 증시: 상승 = 🔴 `#ef4444` / `#b91c1c` (빨강), 하락 = 🔵 `#3b82f6` / `#1e3a8a` (파랑)
+  - 미국 증시: 상승 = 🟢 `#10b981` / `#059669` (초록), 하락 = 🔴 `#ef4444` / `#b91c1c` (빨강)
+
+### 5) 3단계 스마트 순차 전송 파이프라인 (`sendTelegramReportWithPhotos`)
+- **전송 순서**:
+  1. **1단계**: `[헤더 & 최상단 지수 종합 시황]` 텍스트 발송
+  2. **2단계**: `[네이버 공식 지수 차트 + 고해상도 시총 히트맵]` 묶음 사진 앨범(`sendMediaGroup`) 발송 (시황 바로 아래 위치)
+  3. **3단계**: `[종목별 시가총액 순위 분석 & 핵심 요약 리포트]` 본문 텍스트 순차 발송
+- **링크 미리보기 비활성화**:
+  - 종목별 네이버 금융 링크가 포함된 모든 메시지 전송 시 `disable_web_page_preview: true`를 지정하여 불필요한 링크 미리보기 배너로 인한 가독성 저하를 방지합니다.
 
 ## 6. 🔒 배포 및 깃허브(GitHub) 동기화 전 필수 절차
 
