@@ -1458,7 +1458,7 @@ function fetchKrxMarketData(marketType, topN) {
     }
     
     if (marketType === 'KOSDAK' || marketType === 'ALL') {
-      const kosdakUrl = `https://m.stock.naver.com/api/stocks/marketValue/KOSDAK?page=1&pageSize=${pageSize}`;
+      const kosdakUrl = `https://m.stock.naver.com/api/stocks/marketValue/KOSDAQ?page=1&pageSize=${pageSize}`;
       const kosdakRes = UrlFetchApp.fetch(kosdakUrl, { headers: headers, muteHttpExceptions: true });
       if (kosdakRes.getResponseCode() === 200) {
         const data = JSON.parse(kosdakRes.getContentText());
@@ -1621,38 +1621,101 @@ function fetchMarketIndices(marketType) {
  * - 박스 면적: 섹터/업종 규모 비례 (Patchwork Treemap)
  * - 색상: 국내(상승=빨강, 하락=파랑) / 미국(상승=초록, 하락=빨강)
  */
-function cleanSectorHeatmapName(raw) {
+/**
+ * 📊 섹터별 클러스터링 기반 고품질 증시 시가총액 히트맵(트리맵) 엔진 (v3.2.0)
+ * - 한경 마켓맵 / 핀비즈(Finviz) 스타일의 업종별 클러스터 그룹화 + 상위 40~50개 전 종목 타일링
+ * - 캔버스: 1200x1200 HD 정사각 타일링 (모바일 화면 전체 채움 및 선명한 가독성)
+ * - 7단계 정밀 등락률 컬러 그라데이션 (국내: 상승 빨강, 하락 파랑 / 미국: 상승 녹색, 하락 빨강)
+ */
+function cleanHeatmapStockName(raw) {
   let name = (raw || '').replace(/["']/g, '').trim();
-  if (name === '반도체와반도체장비') return '반도체';
-  if (name === '디스플레이장비및부품') return '디스플레이';
-  if (name === '건강관리장비와용품') return '헬스케어/의료';
-  if (name === '생명과학도구및서비스') return '바이오/생명';
-  if (name === '도로와철도운송') return '운송/물류';
-  if (name === '방송과엔터테인먼트') return '엔터/미디어';
-  if (name === '섬유,의류,신발,호화품') return '섬유/패션';
-  if (name === '전자장비와기기') return '전자/IT장비';
-  if (name === '식품과기본식료품소매') return '식료품소매';
-  if (name === '소프트웨어 및 IT 서비스') return '소프트웨어/IT';
-  if (name === '컴퓨터, 전화 및 가전제품') return '하드웨어/가전';
-  if (name === '다양한 소매업') return '전자상거래/소매';
-  if (name === '자동차 및 부품') return '자동차/부품';
+  if (name === '한화에어로스페이스') return '한화에어로';
+  if (name === '두산에너빌리티') return '두산에너빌';
+  if (name === '레인보우로보틱스') return '레인보우로보';
+  if (name === '삼성바이오로직스') return '삼성바이오';
+  if (name === 'LG에너지솔루션') return 'LG엔솔';
+  if (name === 'HD현대중공업') return 'HD현대중공';
+  if (name === '에코프로비엠') return '에코프로비엠';
   if (name.length > 7) return name.slice(0, 6) + '..';
   return name;
 }
 
+function getMarketClusterName(sector, stockName, marketType) {
+  const s = (sector || '') + ' ' + (stockName || '');
+  if (marketType === 'KOSPI') {
+    if (/반도체|전자|디스플레이|IT장비|가전|전기|SK하이닉스|삼성전자/.test(s)) return '전기 · 전자';
+    if (/2차전지|배터리|화학|정유|석유|에너지|LG화학|삼성SDI|엔솔|퓨처엠|이노베이션/.test(s)) return '2차전지 · 화학';
+    if (/제약|바이오|생명|의료|생물|셀트리온|한미|유한|바이오팜/.test(s)) return '제약 · 바이오';
+    if (/자동차|부품|조선|항공|운송|물류|해운|현대차|기아|모비스|중공업|한화오션/.test(s)) return '자동차 · 운송';
+    if (/은행|증권|보험|금융|지주|카드|KB|신한|하나금융|우리금융|삼성생명|삼성화재|메리츠/.test(s)) return '금융 · 지주';
+    if (/기계|방산|원전|우주|전력|LS|에어로|로템|효성|에너빌/.test(s)) return '기계 · 방산';
+    if (/소프트웨어|IT서비스|게임|인터넷|포털|NAVER|카카오|크래프톤|엔씨/.test(s)) return 'IT · 서비스';
+    if (/철강|금속|비철|POSCO|고려아연|제철/.test(s)) return '철강 · 금속';
+    if (/물산|유통|상사|음식|식품|패션|의류|화장품|KT&G/.test(s)) return '유통 · 소비재';
+    if (/통신|전력|가스|유틸리티|텔레콤|KT|한전/.test(s)) return '통신 · 유틸리티';
+    return '기타 주도주';
+  } else if (marketType === 'KOSDAK') {
+    if (/제약|바이오|생명|치료|신약|생물|백신|알테오젠|HLB|삼천당|리가켐|휴젤|파마리서치|에스티팜|에이비엘|보로노이|올릭스|셀트리온제약|펩트론/.test(s)) return '제약 · 바이오';
+    if (/2차전지|전기제품|양극재|음극재|배터리|에코프로|엔켐|대주전자|코스모/.test(s)) return '2차전지 · 소재';
+    if (/반도체|소부장|장비|부품|디스플레이|전자|리노공업|HPSP|주성|원익|이오테크|솔브레인|동진|피에스케이|유진|테스|마이크론|테크윙|ISC|티씨케이/.test(s)) return '반도체 · IT부품';
+    if (/의료기기|헬스케어|미용|보톡스|임플란트|클래시스|파크시스템스|티에스이|덴티움/.test(s)) return '의료기기 · 헬스';
+    if (/로봇|기계|자동화|레인보우|로보/.test(s)) return '로봇 · 장비';
+    if (/엔터|미디어|방송|콘텐츠|게임|소프트웨어|IT|JYP|에스엠|펄어비스|카카오게임즈|위메이드/.test(s)) return '엔터 · 게임 · IT';
+    return '기타 성장주';
+  } else {
+    if (/Semiconductor|Hardware|Tech|반도체|하드웨어|NVDA|AAPL|AVGO|TSM|AMD|QCOM|INTC/.test(s)) return '빅테크 · 반도체';
+    if (/Software|Cloud|Platform|소프트웨어|클라우드|MSFT|GOOGL|META|ORCL|CRM|PLTR/.test(s)) return '플랫폼 · 소프트';
+    if (/Auto|EV|Consumer|Retail|소비재|전기차|TSLA|AMZN|WMT|COST|HD|NKE|MCD/.test(s)) return '소비재 · 전기차';
+    if (/Bank|Financial|Finance|금융|은행|JPM|BAC|WFC|MS|GS|V|MA/.test(s)) return '금융 · 결제';
+    if (/Health|Pharma|Bio|헬스케어|제약|LLY|UNH|JNJ|ABBV|MRK/.test(s)) return '헬스케어 · 바이오';
+    if (/Energy|Industrial|Defense|에너지|산업|XOM|CVX|CAT|GE|RTX/.test(s)) return '에너지 · 산업';
+    return '글로벌 대표주';
+  }
+}
+
+function getHeatmapColor(rate, isUs) {
+  if (isUs) {
+    if (rate >= 3.0) return '#059669';
+    if (rate >= 1.5) return '#10b981';
+    if (rate >= 0.5) return '#34d399';
+    if (rate > -0.5) return '#334155';
+    if (rate > -1.5) return '#f87171';
+    if (rate > -3.0) return '#ef4444';
+    return '#b91c1c';
+  } else {
+    if (rate >= 3.0) return '#ef4444';
+    if (rate >= 1.5) return '#dc2626';
+    if (rate >= 0.5) return '#8a414e';
+    if (rate > -0.5) return '#334155';
+    if (rate > -1.5) return '#475569';
+    if (rate > -2.5) return '#3b82f6';
+    if (rate > -4.0) return '#2563eb';
+    return '#1e3a8a';
+  }
+}
+
+function getHeatmapFontSizes(area) {
+  if (area >= 200) return { name: 38, rate: 26 };
+  if (area >= 100) return { name: 30, rate: 22 };
+  if (area >= 50) return { name: 24, rate: 18 };
+  if (area >= 25) return { name: 19, rate: 15 };
+  return { name: 16, rate: 13 };
+}
+
 function generateMarketHeatmapUrl(arg1, arg2) {
   const marketType = (typeof arg1 === 'string') ? arg1 : (typeof arg2 === 'string' ? arg2 : 'KOSPI');
-  const stockList = Array.isArray(arg2) ? arg2 : (Array.isArray(arg1) ? arg1 : []);
+  let stockList = Array.isArray(arg2) ? arg2 : (Array.isArray(arg1) ? arg1 : []);
   const isUs = marketType === 'US';
-  
-  // 모바일 및 고해상도 화면에서 글자 열화 없이 선명하게 읽히도록 1200x800 고해상도(HD) 적용
   const width = 1200;
-  const height = 800;
+  const height = 1200;
 
   try {
+    let items = [];
+
     if (!isUs) {
-      // 1. 국내 증시: 네이버 업종별 전체 시황 API 호출 (상위 10개 핵심 주도 업종 집중 배치로 박스 및 폰트 대폭 확대)
-      const url = 'https://m.stock.naver.com/api/stocks/industry?page=1&pageSize=100';
+      // 1. 국내 증시: 각 종목명 가독성 극대화를 위해 핵심 상위 32개 주도주 선별 (ETF/ETN 제외)
+      const apiCode = marketType === 'KOSDAK' ? 'KOSDAQ' : marketType;
+      const url = `https://m.stock.naver.com/api/stocks/marketValue/${apiCode}?page=1&pageSize=45`;
       const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*'
@@ -1660,70 +1723,83 @@ function generateMarketHeatmapUrl(arg1, arg2) {
       const res = UrlFetchApp.fetch(url, { headers: headers, muteHttpExceptions: true });
       if (res.getResponseCode() === 200) {
         const json = JSON.parse(res.getContentText());
-        const list = (json.groups || []).filter(g => g.name !== '기타' && g.name !== 'Other');
-        list.sort((a, b) => b.totalCount - a.totalCount);
-        const topIndustries = list.slice(0, 10); // 핵심 10개 업종으로 선명한 가독성 확보
+        let rawList = (json && json.stocks) ? json.stocks : (Array.isArray(json) ? json : []);
+        rawList = rawList.filter(s => {
+          const name = s.stockName || '';
+          return !/KODEX|TIGER|ACE|SOL|PLUS|KOSEF|KBSTAR|HANARO|ARIRANG|WOORI|TIMEFOLIO|히어로즈|파워|스팩|ETN/.test(name);
+        }).slice(0, 32);
 
-        const nodes = topIndustries.map((item, idx) => {
-          const change = parseFloat((item.changeRate || '0').toString().replace(/,/g, ''));
-          const sign = change > 0 ? '+' : '';
-          const color = change >= 1.5 ? '#b91c1c' : (change > 0 ? '#ef4444' : (change <= -1.5 ? '#1e3a8a' : (change < 0 ? '#3b82f6' : '#475569')));
-          const name = cleanSectorHeatmapName(item.name);
-          const label = `${name}\\n${sign}${change.toFixed(1)}%`;
-          const area = Math.max(item.totalCount || 10, 10);
-          const fsize = idx < 2 ? 26 : (idx < 5 ? 22 : 18);
-          return `ind_${idx} [label="${label}", area=${area}, fillcolor="${color}", fontsize=${fsize}];`;
-        }).join('\n  ');
-
-        const title = marketType === 'KOSDAK' ? '코스닥 주요 업종별 전체 시황 히트맵' : '국내 증시 주요 업종별 전체 시황 히트맵';
-        const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#0b0f19", pad=0.2, margin=0, label="${title}", labelloc=t, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, fontsize=24];\n  node [style="filled,rounded", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=2, color="#1e293b"];\n  ${nodes}\n}`;
-        return `https://quickchart.io/graphviz?format=png&width=${width}&height=${height}&graph=` + encodeURIComponent(dot);
+        items = rawList.map(item => {
+          const cap = parseFloat((item.marketValue || '0').toString().replace(/,/g, '')) || 1000;
+          const rate = parseFloat((item.fluctuationsRatio || item.changeRate || '0').toString().replace(/,/g, ''));
+          return {
+            name: cleanHeatmapStockName(item.stockName),
+            code: item.itemCode,
+            cap: cap,
+            rate: isNaN(rate) ? 0 : rate,
+            sector: item.industryCode || ''
+          };
+        });
       }
     }
-  } catch (err) {
-    Logger.log('generateMarketHeatmapUrl domestic fetch error: ' + err.toString());
-  }
 
-  // 2. 미국 증시 또는 국내 API 폴백: 섹터별 가중 평균 집계 (상위 10개 대표 섹터)
-  try {
-    const sectorMap = {};
-    (stockList || []).forEach(s => {
-      const sec = s.sector || '기타';
-      if (!sectorMap[sec]) sectorMap[sec] = { name: sec, cap: 0, sumReturn: 0, count: 0 };
-      const cap = s.marketCapRaw || 1000000000;
-      sectorMap[sec].cap += cap;
-      sectorMap[sec].sumReturn += (s.changeRate || 0) * cap;
-      sectorMap[sec].count++;
+    // 2. 미국 또는 API 폴백: 전달받은 stockList 활용
+    if (items.length === 0 && Array.isArray(stockList) && stockList.length > 0) {
+      items = stockList.slice(0, 32).map(s => {
+        const cap = s.marketCapRaw || 10000;
+        const rate = (typeof s.changeRate === 'number') ? s.changeRate : (parseFloat(s.changeRate) || 0);
+        return {
+          name: cleanHeatmapStockName(s.stockName || s.name),
+          code: s.code || '',
+          cap: cap,
+          rate: rate,
+          sector: s.sector || ''
+        };
+      });
+    }
+
+    if (items.length === 0) return null;
+
+    const maxCap = Math.max(...items.map(s => s.cap));
+
+    // 섹터별 클러스터 그룹화
+    const clusterMap = {};
+    items.forEach(stock => {
+      const cluster = getMarketClusterName(stock.sector, stock.name, marketType);
+      if (!clusterMap[cluster]) clusterMap[cluster] = [];
+      clusterMap[cluster].push(stock);
     });
 
-    const sectors = Object.values(sectorMap);
-    sectors.forEach(s => {
-      s.changeRate = s.cap > 0 ? (s.sumReturn / s.cap) : 0;
+    const clusterKeys = Object.keys(clusterMap);
+    clusterKeys.sort((a, b) => {
+      const sumA = clusterMap[a].reduce((acc, s) => acc + s.cap, 0);
+      const sumB = clusterMap[b].reduce((acc, s) => acc + s.cap, 0);
+      return sumB - sumA;
     });
-    sectors.sort((a, b) => b.cap - a.cap);
-    const topSectors = sectors.slice(0, 10);
 
-    const nodes = topSectors.map((item, idx) => {
-      const change = item.changeRate || 0;
-      const sign = change > 0 ? '+' : '';
-      let color;
-      if (isUs) {
-        color = change >= 1.5 ? '#15803d' : (change > 0 ? '#22c55e' : (change <= -1.5 ? '#b91c1c' : (change < 0 ? '#ef4444' : '#475569')));
-      } else {
-        color = change >= 1.5 ? '#b91c1c' : (change > 0 ? '#ef4444' : (change <= -1.5 ? '#1e3a8a' : (change < 0 ? '#3b82f6' : '#475569')));
-      }
-      const name = cleanSectorHeatmapName(item.name);
-      const label = `${name}\\n${sign}${change.toFixed(1)}%`;
-      const area = Math.max(Math.round(item.cap / (isUs ? 100000000000 : 10000)) || 10, 10);
-      const fsize = idx < 2 ? 26 : (idx < 5 ? 22 : 18);
-      return `sec_${idx} [label="${label}", area=${area}, fillcolor="${color}", fontsize=${fsize}];`;
-    }).join('\n  ');
+    const clusterDoms = clusterKeys.map((cName, cIdx) => {
+      const stocks = clusterMap[cName];
+      const nodes = stocks.map((s, sIdx) => {
+        const normRatio = Math.sqrt(s.cap / maxCap);
+        const area = Math.max(Math.round(normRatio * 320), 22);
+        const sign = s.rate > 0 ? '+' : '';
+        const color = getHeatmapColor(s.rate, isUs);
+        const fs = getHeatmapFontSizes(area);
+        // 종목명을 크고 굵은 폰트(<b>태그 및 point-size 분리)로 강조
+        const label = `<<b><font point-size="${fs.name}">${s.name}</font></b><br/><font point-size="${fs.rate}">${sign}${s.rate.toFixed(2)}%</font>>`;
+        return `n_${cIdx}_${sIdx} [label=${label}, area=${area}, fillcolor="${color}"];`;
+      }).join('\n    ');
 
-    const title = isUs ? '미국 증시 주요 섹터별 전체 시황 히트맵' : '증시 주요 섹터별 전체 시황 히트맵';
-    const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#0b0f19", pad=0.2, margin=0, label="${title}", labelloc=t, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, fontsize=24];\n  node [style="filled,rounded", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=2, color="#1e293b"];\n  ${nodes}\n}`;
+      const hdr = `h_${cIdx} [label=<<b>■ ${cName}</b>>, area=10, fillcolor="#1e293b", fontcolor="#94a3b8", fontsize=14];`;
+
+      return `  subgraph cluster_${cIdx} {\n    graph [style="invis"];\n    ${hdr}\n    ${nodes}\n  }`;
+    }).join('\n\n');
+
+    const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#090d16", pad=0.01, margin=0];\n  node [style="filled", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=1.5, color="#090d16"];\n\n${clusterDoms}\n}`;
+
     return `https://quickchart.io/graphviz?format=png&width=${width}&height=${height}&graph=` + encodeURIComponent(dot);
   } catch (err) {
-    Logger.log('generateMarketHeatmapUrl fallback error: ' + err.toString());
+    Logger.log('generateMarketHeatmapUrl hierarchical error: ' + err.toString());
     return null;
   }
 }
@@ -2513,8 +2589,8 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
       if (heatmapKospi) photosKospi.push(heatmapKospi);
     }
     const captionKospi = isHol 
-      ? `📊 코스피(KOSPI) 최근 거래일 마감 공식 흐름 차트 & 업종별 전체 시황 히트맵` 
-      : `📊 코스피(KOSPI) 당일 공식 흐름 차트 & 업종별 전체 시황 히트맵`;
+      ? `📊 코스피(KOSPI) 최근 거래일 마감 공식 흐름 차트 & 주요 섹터별 전 종목 시황 히트맵` 
+      : `📊 코스피(KOSPI) 당일 공식 흐름 차트 & 주요 섹터별 전 종목 시황 히트맵`;
     results.push(sendTelegramReportWithPhotos(config, sectionsKospi.headerHtml, photosKospi, captionKospi, sectionsKospi.bodyHtml));
   }
   
@@ -2535,8 +2611,8 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
       if (heatmapKosdak) photosKosdak.push(heatmapKosdak);
     }
     const captionKosdak = isHol 
-      ? `📊 코스닥(KOSDAQ) 최근 거래일 마감 공식 흐름 차트 & 업종별 전체 시황 히트맵` 
-      : `📊 코스닥(KOSDAQ) 당일 공식 흐름 차트 & 업종별 전체 시황 히트맵`;
+      ? `📊 코스닥(KOSDAQ) 최근 거래일 마감 공식 흐름 차트 & 주요 섹터별 전 종목 시황 히트맵` 
+      : `📊 코스닥(KOSDAQ) 당일 공식 흐름 차트 & 주요 섹터별 전 종목 시황 히트맵`;
     results.push(sendTelegramReportWithPhotos(config, sectionsKosdak.headerHtml, photosKosdak, captionKosdak, sectionsKosdak.bodyHtml));
   }
   
