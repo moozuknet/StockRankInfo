@@ -9,6 +9,9 @@
 ### 1) Clasp CLI를 이용한 로컬 코드 푸시 및 배포
 본 프로젝트는 Google `clasp` CLI를 통해 로컬 환경에서 온라인 GAS 프로젝트로 소스 코드를 즉시 업로드하고 버전을 관리합니다.
 
+> ⚠️ **[배포 관리 핵심 원칙 - 단일 최신 배포 유지]**
+> GAS 배포 시 구버전 배포가 누적되면 트리거 및 Web App URL 혼선이 발생하므로, **새로운 배포를 생성한 직후에는 항상 이전 배포 ID를 `npx clasp undeploy <OLD_DEPLOYMENT_ID>`로 즉각 삭제하여 오직 최신 배포 1개만 활성 상태로 유지**해야 합니다.
+
 ```bash
 # 1. 의존성 및 clasp 설치 확인
 npx clasp --version
@@ -16,14 +19,14 @@ npx clasp --version
 # 2. 로컬 코드 온라인 GAS 프로젝트로 강제 푸시 (.claspignore 자동 적용)
 npx clasp push --force
 
-# 3. 새로운 버전 생성 및 배포 (Production Web App)
-npx clasp deploy --description "v2.0 Release - KRX/NXT Time-based Multi-session Engine"
+# 3. 새로운 최신 버전 생성 및 배포 (Production Web App)
+npx clasp deploy --description "vX.X.X Release - 변경사항 요약"
 
 # 4. 활성화된 배포 목록 및 실행 ID 확인
 npx clasp deployments
 
-# 5. 불필요한 구버전 배포 해제 (단일 프로덕션 버전 유지)
-npx clasp undeploy <DEPLOYMENT_ID>
+# 5. [필수] 이전 구버전 배포 즉시 삭제 (최신 배포 1개만 단일 유지)
+npx clasp undeploy <OLD_DEPLOYMENT_ID>
 ```
 
 ### 2) `.clasp.json` 파일 구조
@@ -291,14 +294,20 @@ flowchart TD
   Start-Process -FilePath "C:\Program Files\Google\Chrome\Application\chrome.exe" -ArgumentList '--headless --disable-gpu --no-sandbox --screenshot=C:\dev\Antigravity\StockRankInfo\assets\dashboard_preview.png --window-size=1280,1850 file:///C:/dev/Antigravity/StockRankInfo/Index.html' -Wait
   ```
 
-### 2) 🚀 Google Apps Script (GAS) 온라인 배포
-- clasp CLI를 통해 최신 코드를 푸시하고 프로덕션 배포 버전을 생성합니다.
+### 2) 🚀 Google Apps Script (GAS) 온라인 배포 및 이전 배포 정리 (필수 원칙)
+- **원칙**: 구버전 배포가 중복 누적되지 않도록, **새 배포 생성 후 이전 배포는 반드시 삭제(`undeploy`)하여 최신 배포 1개만 단일 유지**합니다.
   ```bash
   # 1. 파일 푸시 (.claspignore 자동 적용)
   npx clasp push --force
 
-  # 2. 프로덕션 배포 갱신
-  npx clasp deploy -i <DEPLOYMENT_ID> -d "vX.X.X Release - 변경사항 요약"
+  # 2. 프로덕션 최신 배포 생성
+  npx clasp deploy --description "vX.X.X Release - 변경사항 요약"
+
+  # 3. 배포 목록 확인
+  npx clasp deployments
+
+  # 4. 이전 구버전 배포 삭제 (반드시 실행하여 최신 배포 1개만 유지)
+  npx clasp undeploy <이전_DEPLOYMENT_ID>
   ```
 
 ### 3) 🔒 보안 및 깃허브(GitHub) 동기화
