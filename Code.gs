@@ -1615,58 +1615,96 @@ function fetchMarketIndices(marketType) {
 }
 
 /**
- * 종목 리스트(시가총액 상위 종목) 기반 시가총액 비율 및 등락률 히트맵(트리맵) 이미지 생성
- * - 네모난 영역(Patchwork Treemap)으로 시총 비율을 시각화
- * - 국내 증시: 상승=빨강, 하락=파랑
- * - 미국 증시: 상승=초록, 하락=빨강
+ * 시장 전체 시황(업종별/섹터별) 가중치 및 등락률 기반 전체 시황 히트맵(트리맵) 이미지 생성
+ * - 국내 증시: 네이버 증권 79개 업종별 전체 시장 API 실시간 집계 (상위 16개 핵심 산업 섹터)
+ * - 미국 증시: 전체 시장 주요 섹터(반도체, 소프트웨어, IT, 자동차, 금융, 헬스케어 등) 가중 평균 집계
+ * - 박스 면적: 섹터/업종 규모 비례 (Patchwork Treemap)
+ * - 색상: 국내(상승=빨강, 하락=파랑) / 미국(상승=초록, 하락=빨강)
  */
-function generateMarketHeatmapUrl(stockList, marketType) {
-  if (!stockList || !Array.isArray(stockList) || stockList.length === 0) return null;
-  
+function generateMarketHeatmapUrl(arg1, arg2) {
+  const marketType = (typeof arg1 === 'string') ? arg1 : (typeof arg2 === 'string' ? arg2 : 'KOSPI');
+  const stockList = Array.isArray(arg2) ? arg2 : (Array.isArray(arg1) ? arg1 : []);
+  const isUs = marketType === 'US';
+  const width = 850;
+  const height = 550;
+
   try {
-    const isUs = marketType === 'US';
-    const width = 800;
-    const height = 550;
-    const targetStocks = stockList.slice(0, 12); // 상위 12개 주요 종목 대상
-    
-    const nodes = targetStocks.map((s, idx) => {
-      const change = typeof s.changeRate === 'number' ? s.changeRate : 0;
+    if (!isUs) {
+      // 1. 국내 증시: 네이버 업종별 전체 시황 API 호출
+      const url = 'https://m.stock.naver.com/api/stocks/industry?page=1&pageSize=100';
+      const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+      };
+      const res = UrlFetchApp.fetch(url, { headers: headers, muteHttpExceptions: true });
+      if (res.getResponseCode() === 200) {
+        const json = JSON.parse(res.getContentText());
+        const list = (json.groups || []).filter(g => g.name !== '기타' && g.name !== 'Other');
+        list.sort((a, b) => b.totalCount - a.totalCount);
+        const topIndustries = list.slice(0, 16);
+
+        const nodes = topIndustries.map((item, idx) => {
+          const change = parseFloat((item.changeRate || '0').toString().replace(/,/g, ''));
+          const sign = change > 0 ? '+' : '';
+          const color = change >= 1.5 ? '#b91c1c' : (change > 0 ? '#ef4444' : (change <= -1.5 ? '#1e3a8a' : (change < 0 ? '#3b82f6' : '#475569')));
+          let name = item.name.replace(/["']/g, '');
+          if (name.length > 7) name = name.slice(0, 6) + '..';
+          const label = `${name}\\n${sign}${change.toFixed(1)}%`;
+          const area = Math.max(item.totalCount || 10, 10);
+          const fsize = idx < 3 ? 19 : (idx < 7 ? 16 : 13);
+          return `ind_${idx} [label="${label}", area=${area}, fillcolor="${color}", fontsize=${fsize}];`;
+        }).join('\n  ');
+
+        const title = marketType === 'KOSDAK' ? '코스닥 업종별 전체 시황 히트맵' : '코스피/국내 업종별 전체 시황 히트맵';
+        const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#0b0f19", pad=0.25, margin=0, label="${title}", labelloc=t, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, fontsize=18];\n  node [style="filled,rounded", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=1.5, color="#1e293b"];\n  ${nodes}\n}`;
+        return `https://quickchart.io/graphviz?format=png&width=${width}&height=${height}&graph=` + encodeURIComponent(dot);
+      }
+    }
+  } catch (err) {
+    Logger.log('generateMarketHeatmapUrl domestic fetch error: ' + err.toString());
+  }
+
+  // 2. 미국 증시 또는 국내 API 폴백: 섹터별 가중 평균 집계
+  try {
+    const sectorMap = {};
+    (stockList || []).forEach(s => {
+      const sec = s.sector || '기타';
+      if (!sectorMap[sec]) sectorMap[sec] = { name: sec, cap: 0, sumReturn: 0, count: 0 };
+      const cap = s.marketCapRaw || 1000000000;
+      sectorMap[sec].cap += cap;
+      sectorMap[sec].sumReturn += (s.changeRate || 0) * cap;
+      sectorMap[sec].count++;
+    });
+
+    const sectors = Object.values(sectorMap);
+    sectors.forEach(s => {
+      s.changeRate = s.cap > 0 ? (s.sumReturn / s.cap) : 0;
+    });
+    sectors.sort((a, b) => b.cap - a.cap);
+    const topSectors = sectors.slice(0, 12);
+
+    const nodes = topSectors.map((item, idx) => {
+      const change = item.changeRate || 0;
       const sign = change > 0 ? '+' : '';
       let color;
       if (isUs) {
-        if (change >= 2) color = '#15803d'; // 진한 초록
-        else if (change > 0) color = '#22c55e'; // 밝은 초록
-        else if (change <= -2) color = '#b91c1c'; // 진한 빨강
-        else if (change < 0) color = '#ef4444'; // 밝은 빨강
-        else color = '#475569'; // 보합
+        color = change >= 1.5 ? '#15803d' : (change > 0 ? '#22c55e' : (change <= -1.5 ? '#b91c1c' : (change < 0 ? '#ef4444' : '#475569')));
       } else {
-        if (change >= 2) color = '#b91c1c'; // 진한 빨강
-        else if (change > 0) color = '#ef4444'; // 밝은 빨강
-        else if (change <= -2) color = '#1e3a8a'; // 진한 파랑
-        else if (change < 0) color = '#3b82f6'; // 밝은 파랑
-        else color = '#475569'; // 보합
+        color = change >= 1.5 ? '#b91c1c' : (change > 0 ? '#ef4444' : (change <= -1.5 ? '#1e3a8a' : (change < 0 ? '#3b82f6' : '#475569')));
       }
-      
-      const fsize = idx < 2 ? 18 : (idx < 5 ? 14 : 11);
-      let name = (s.name || '').replace(/["']/g, '');
-      if (name.length > 7) name = name.slice(0, 6) + '..';
+      let name = item.name.replace(/["']/g, '');
+      if (name.length > 8) name = name.slice(0, 7) + '..';
       const label = `${name}\\n${sign}${change.toFixed(1)}%`;
-      
-      // 시가총액 기반 면적 가중치 계산
-      let capNum = (typeof s.marketCapRaw === 'number' && s.marketCapRaw > 0) ? s.marketCapRaw : 1000;
-      if (isUs && capNum > 1000000000) capNum = Math.round(capNum / 1000000000);
-      else if (capNum > 10000) capNum = Math.round(capNum / 10000);
-      const area = Math.max(capNum, 10);
-      
-      return `n${idx}[label="${label}",area=${area},fillcolor="${color}",fontsize=${fsize}]`;
-    }).join(';');
-    
-    const title = isUs ? '미국 증시 주요 종목 히트맵' : (marketType === 'KOSDAK' ? '코스닥 시가총액 히트맵' : '코스피 시가총액 히트맵');
-    const dot = `graph{layout=patchwork;bgcolor="#0b0f19";pad=0.2;label="${title}";labelloc=t;fontname="NanumGothic, Arial, sans-serif";fontcolor=white;fontsize=16;node[style="filled,rounded",shape=box,fontname="NanumGothic, Arial, sans-serif",fontcolor=white,color="#1e293b",penwidth=1.5];${nodes};}`;
-    
+      const area = Math.max(Math.round(item.cap / (isUs ? 100000000000 : 10000)) || 10, 10);
+      const fsize = idx < 2 ? 19 : (idx < 5 ? 16 : 13);
+      return `sec_${idx} [label="${label}", area=${area}, fillcolor="${color}", fontsize=${fsize}];`;
+    }).join('\n  ');
+
+    const title = isUs ? '미국 증시 섹터별 전체 시황 히트맵' : (marketType === 'KOSDAK' ? '코스닥 섹터별 전체 시황 히트맵' : '코스피 섹터별 전체 시황 히트맵');
+    const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#0b0f19", pad=0.25, margin=0, label="${title}", labelloc=t, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, fontsize=18];\n  node [style="filled,rounded", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=1.5, color="#1e293b"];\n  ${nodes}\n}`;
     return `https://quickchart.io/graphviz?format=png&width=${width}&height=${height}&graph=` + encodeURIComponent(dot);
-  } catch (e) {
-    Logger.log('generateMarketHeatmapUrl warning: ' + e.toString());
+  } catch (err) {
+    Logger.log('generateMarketHeatmapUrl fallback error: ' + err.toString());
     return null;
   }
 }
@@ -2456,8 +2494,8 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
       if (heatmapKospi) photosKospi.push(heatmapKospi);
     }
     const captionKospi = isHol 
-      ? `📊 코스피(KOSPI) 최근 거래일 마감 공식 흐름 차트 & 시총 히트맵` 
-      : `📊 코스피(KOSPI) 당일 공식 흐름 차트 & 시총 히트맵`;
+      ? `📊 코스피(KOSPI) 최근 거래일 마감 공식 흐름 차트 & 업종별 전체 시황 히트맵` 
+      : `📊 코스피(KOSPI) 당일 공식 흐름 차트 & 업종별 전체 시황 히트맵`;
     results.push(sendTelegramReportWithPhotos(config, sectionsKospi.headerHtml, photosKospi, captionKospi, sectionsKospi.bodyHtml));
   }
   
@@ -2474,12 +2512,12 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
       photosKosdak.push(indicesKosdak.kosdak.chartUrl);
     }
     if (config.enableHeatmap !== false) {
-      const heatmapKosdak = generateMarketHeatmapUrl(processedKosdak, 'KOSDAK');
+      const heatmapKosdak = generateMarketHeatmapUrl('KOSDAK', processedKosdak);
       if (heatmapKosdak) photosKosdak.push(heatmapKosdak);
     }
     const captionKosdak = isHol 
-      ? `📊 코스닥(KOSDAQ) 최근 거래일 마감 공식 흐름 차트 & 시총 히트맵` 
-      : `📊 코스닥(KOSDAQ) 당일 공식 흐름 차트 & 시총 히트맵`;
+      ? `📊 코스닥(KOSDAQ) 최근 거래일 마감 공식 흐름 차트 & 업종별 전체 시황 히트맵` 
+      : `📊 코스닥(KOSDAQ) 당일 공식 흐름 차트 & 업종별 전체 시황 히트맵`;
     results.push(sendTelegramReportWithPhotos(config, sectionsKosdak.headerHtml, photosKosdak, captionKosdak, sectionsKosdak.bodyHtml));
   }
   
@@ -2533,12 +2571,12 @@ function sendUsReport() {
   if (indicesUs && indicesUs.nasdaq && indicesUs.nasdaq.chartUrl) photosUs.push(indicesUs.nasdaq.chartUrl);
   if (indicesUs && indicesUs.spx && indicesUs.spx.chartUrl) photosUs.push(indicesUs.spx.chartUrl);
   if (config.enableHeatmap !== false) {
-    const heatmapUs = generateMarketHeatmapUrl(processed, 'US');
+    const heatmapUs = generateMarketHeatmapUrl('US', processed);
     if (heatmapUs) photosUs.push(heatmapUs);
   }
   const captionUs = isUsHol 
-    ? '📊 미국 증시 최근 거래일 마감 공식 흐름 차트(나스닥/S&P 500) & 시총 히트맵' 
-    : '📊 미국 증시 당일 공식 흐름 차트(나스닥/S&P 500) & 시총 히트맵';
+    ? '📊 미국 증시 최근 거래일 마감 공식 흐름 차트(나스닥/S&P 500) & 섹터별 전체 시황 히트맵' 
+    : '📊 미국 증시 당일 공식 흐름 차트(나스닥/S&P 500) & 섹터별 전체 시황 히트맵';
 
   return sendTelegramReportWithPhotos(config, sectionsUs.headerHtml, photosUs, captionUs, sectionsUs.bodyHtml);
 }
@@ -2573,12 +2611,12 @@ function sendManualUsReport() {
   if (indicesUs && indicesUs.nasdaq && indicesUs.nasdaq.chartUrl) photosUs.push(indicesUs.nasdaq.chartUrl);
   if (indicesUs && indicesUs.spx && indicesUs.spx.chartUrl) photosUs.push(indicesUs.spx.chartUrl);
   if (config.enableHeatmap !== false) {
-    const heatmapUs = generateMarketHeatmapUrl(processed, 'US');
+    const heatmapUs = generateMarketHeatmapUrl('US', processed);
     if (heatmapUs) photosUs.push(heatmapUs);
   }
   const captionUs = isUsHol 
-    ? '📊 미국 증시 최근 거래일 마감 공식 흐름 차트(나스닥/S&P 500) & 시총 히트맵' 
-    : '📊 미국 증시 당일 공식 흐름 차트(나스닥/S&P 500) & 시총 히트맵';
+    ? '📊 미국 증시 최근 거래일 마감 공식 흐름 차트(나스닥/S&P 500) & 섹터별 전체 시황 히트맵' 
+    : '📊 미국 증시 당일 공식 흐름 차트(나스닥/S&P 500) & 섹터별 전체 시황 히트맵';
 
   return sendTelegramReportWithPhotos(config, sectionsUs.headerHtml, photosUs, captionUs, sectionsUs.bodyHtml);
 }
