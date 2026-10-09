@@ -1621,16 +1621,37 @@ function fetchMarketIndices(marketType) {
  * - 박스 면적: 섹터/업종 규모 비례 (Patchwork Treemap)
  * - 색상: 국내(상승=빨강, 하락=파랑) / 미국(상승=초록, 하락=빨강)
  */
+function cleanSectorHeatmapName(raw) {
+  let name = (raw || '').replace(/["']/g, '').trim();
+  if (name === '반도체와반도체장비') return '반도체';
+  if (name === '디스플레이장비및부품') return '디스플레이';
+  if (name === '건강관리장비와용품') return '헬스케어/의료';
+  if (name === '생명과학도구및서비스') return '바이오/생명';
+  if (name === '도로와철도운송') return '운송/물류';
+  if (name === '방송과엔터테인먼트') return '엔터/미디어';
+  if (name === '섬유,의류,신발,호화품') return '섬유/패션';
+  if (name === '전자장비와기기') return '전자/IT장비';
+  if (name === '식품과기본식료품소매') return '식료품소매';
+  if (name === '소프트웨어 및 IT 서비스') return '소프트웨어/IT';
+  if (name === '컴퓨터, 전화 및 가전제품') return '하드웨어/가전';
+  if (name === '다양한 소매업') return '전자상거래/소매';
+  if (name === '자동차 및 부품') return '자동차/부품';
+  if (name.length > 7) return name.slice(0, 6) + '..';
+  return name;
+}
+
 function generateMarketHeatmapUrl(arg1, arg2) {
   const marketType = (typeof arg1 === 'string') ? arg1 : (typeof arg2 === 'string' ? arg2 : 'KOSPI');
   const stockList = Array.isArray(arg2) ? arg2 : (Array.isArray(arg1) ? arg1 : []);
   const isUs = marketType === 'US';
-  const width = 850;
-  const height = 550;
+  
+  // 모바일 및 고해상도 화면에서 글자 열화 없이 선명하게 읽히도록 1200x800 고해상도(HD) 적용
+  const width = 1200;
+  const height = 800;
 
   try {
     if (!isUs) {
-      // 1. 국내 증시: 네이버 업종별 전체 시황 API 호출
+      // 1. 국내 증시: 네이버 업종별 전체 시황 API 호출 (상위 10개 핵심 주도 업종 집중 배치로 박스 및 폰트 대폭 확대)
       const url = 'https://m.stock.naver.com/api/stocks/industry?page=1&pageSize=100';
       const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -1641,22 +1662,21 @@ function generateMarketHeatmapUrl(arg1, arg2) {
         const json = JSON.parse(res.getContentText());
         const list = (json.groups || []).filter(g => g.name !== '기타' && g.name !== 'Other');
         list.sort((a, b) => b.totalCount - a.totalCount);
-        const topIndustries = list.slice(0, 16);
+        const topIndustries = list.slice(0, 10); // 핵심 10개 업종으로 선명한 가독성 확보
 
         const nodes = topIndustries.map((item, idx) => {
           const change = parseFloat((item.changeRate || '0').toString().replace(/,/g, ''));
           const sign = change > 0 ? '+' : '';
           const color = change >= 1.5 ? '#b91c1c' : (change > 0 ? '#ef4444' : (change <= -1.5 ? '#1e3a8a' : (change < 0 ? '#3b82f6' : '#475569')));
-          let name = item.name.replace(/["']/g, '');
-          if (name.length > 7) name = name.slice(0, 6) + '..';
+          const name = cleanSectorHeatmapName(item.name);
           const label = `${name}\\n${sign}${change.toFixed(1)}%`;
           const area = Math.max(item.totalCount || 10, 10);
-          const fsize = idx < 3 ? 19 : (idx < 7 ? 16 : 13);
+          const fsize = idx < 2 ? 26 : (idx < 5 ? 22 : 18);
           return `ind_${idx} [label="${label}", area=${area}, fillcolor="${color}", fontsize=${fsize}];`;
         }).join('\n  ');
 
-        const title = marketType === 'KOSDAK' ? '코스닥 업종별 전체 시황 히트맵' : '코스피/국내 업종별 전체 시황 히트맵';
-        const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#0b0f19", pad=0.25, margin=0, label="${title}", labelloc=t, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, fontsize=18];\n  node [style="filled,rounded", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=1.5, color="#1e293b"];\n  ${nodes}\n}`;
+        const title = marketType === 'KOSDAK' ? '코스닥 주요 업종별 전체 시황 히트맵' : '국내 증시 주요 업종별 전체 시황 히트맵';
+        const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#0b0f19", pad=0.2, margin=0, label="${title}", labelloc=t, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, fontsize=24];\n  node [style="filled,rounded", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=2, color="#1e293b"];\n  ${nodes}\n}`;
         return `https://quickchart.io/graphviz?format=png&width=${width}&height=${height}&graph=` + encodeURIComponent(dot);
       }
     }
@@ -1664,7 +1684,7 @@ function generateMarketHeatmapUrl(arg1, arg2) {
     Logger.log('generateMarketHeatmapUrl domestic fetch error: ' + err.toString());
   }
 
-  // 2. 미국 증시 또는 국내 API 폴백: 섹터별 가중 평균 집계
+  // 2. 미국 증시 또는 국내 API 폴백: 섹터별 가중 평균 집계 (상위 10개 대표 섹터)
   try {
     const sectorMap = {};
     (stockList || []).forEach(s => {
@@ -1681,7 +1701,7 @@ function generateMarketHeatmapUrl(arg1, arg2) {
       s.changeRate = s.cap > 0 ? (s.sumReturn / s.cap) : 0;
     });
     sectors.sort((a, b) => b.cap - a.cap);
-    const topSectors = sectors.slice(0, 12);
+    const topSectors = sectors.slice(0, 10);
 
     const nodes = topSectors.map((item, idx) => {
       const change = item.changeRate || 0;
@@ -1692,16 +1712,15 @@ function generateMarketHeatmapUrl(arg1, arg2) {
       } else {
         color = change >= 1.5 ? '#b91c1c' : (change > 0 ? '#ef4444' : (change <= -1.5 ? '#1e3a8a' : (change < 0 ? '#3b82f6' : '#475569')));
       }
-      let name = item.name.replace(/["']/g, '');
-      if (name.length > 8) name = name.slice(0, 7) + '..';
+      const name = cleanSectorHeatmapName(item.name);
       const label = `${name}\\n${sign}${change.toFixed(1)}%`;
       const area = Math.max(Math.round(item.cap / (isUs ? 100000000000 : 10000)) || 10, 10);
-      const fsize = idx < 2 ? 19 : (idx < 5 ? 16 : 13);
+      const fsize = idx < 2 ? 26 : (idx < 5 ? 22 : 18);
       return `sec_${idx} [label="${label}", area=${area}, fillcolor="${color}", fontsize=${fsize}];`;
     }).join('\n  ');
 
-    const title = isUs ? '미국 증시 섹터별 전체 시황 히트맵' : (marketType === 'KOSDAK' ? '코스닥 섹터별 전체 시황 히트맵' : '코스피 섹터별 전체 시황 히트맵');
-    const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#0b0f19", pad=0.25, margin=0, label="${title}", labelloc=t, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, fontsize=18];\n  node [style="filled,rounded", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=1.5, color="#1e293b"];\n  ${nodes}\n}`;
+    const title = isUs ? '미국 증시 주요 섹터별 전체 시황 히트맵' : '증시 주요 섹터별 전체 시황 히트맵';
+    const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#0b0f19", pad=0.2, margin=0, label="${title}", labelloc=t, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, fontsize=24];\n  node [style="filled,rounded", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=2, color="#1e293b"];\n  ${nodes}\n}`;
     return `https://quickchart.io/graphviz?format=png&width=${width}&height=${height}&graph=` + encodeURIComponent(dot);
   } catch (err) {
     Logger.log('generateMarketHeatmapUrl fallback error: ' + err.toString());
