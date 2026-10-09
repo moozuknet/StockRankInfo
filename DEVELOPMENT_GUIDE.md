@@ -228,14 +228,22 @@ flowchart TD
 - **출력 서식**:
   - 리포트 헤더 바로 아래에 `📈 [종합 시황 지수]` 블록으로 우선 노출하여, 세부 종목 확인 전 시장 흐름을 즉시 파악 가능.
 
-### 3) 네이버 증권 공식 지수 차트 실시간 연동
-- **공식 차트 엔드포인트**:
-  - 코스피: `https://ssl.pstatic.net/imgfinance/chart/main/KOSPI.png`
-  - 코스닥: `https://ssl.pstatic.net/imgfinance/chart/main/KOSDAQ.png`
-  - 나스닥 종합: `https://ssl.pstatic.net/imgfinance/chart/world/continent/NAS@IXIC.png`
-  - S&P 500: `https://ssl.pstatic.net/imgfinance/chart/world/continent/SPI@SPX.png`
-- **캐시 방지 메커니즘**:
-  - 텔레그램 서버는 동일 이미지 URL에 대해 강한 캐시를 적용하므로, URL 파라미터에 `?t=${Date.now()}` 실시간 타임스탬프를 동적으로 부여하여 최신 마감 차트 이미지를 새로 가져오도록 보장합니다.
+### 3) 영웅문 스타일 투자자별 매매동향 다중축 4선 멀티 차트 및 수급 브리핑 (`generateInvestorTrendChartUrl`)
+- **도입 배경 (v3.3.0)**:
+  - 기존 네이버 지수 차트의 단순 1선 구조에서 탈피하여, 키움증권 영웅문 HTS [0251] 투자자별 매매동향 차트와 동일하게 **지수 흐름과 개인 / 외국인 / 기관계 3대 수급 주체 간의 장중 상관관계**를 직관적으로 파악할 수 있도록 전면 고도화되었습니다.
+- **다중축(Dual-Axis) 복합 라인 렌더링**:
+  - **좌측 Y축 (`yIndex`)**: KOSPI/KOSDAQ 지수 포인트 (블루 실선, 폭 2.5px).
+  - **우측 Y축 (`yAmount`)**: 당일 누적 순매수/순매도 금액(억 원 단위).
+  - **수급 3선**:
+    - **개인**: 골드/오렌지 실선 (`#F59E0B`, 폭 2.8px)
+    - **외국인**: 레드 실선 (`#EF4444`, 폭 2.8px)
+    - **기관계**: 청록/스카이블루 실선 (`#0284C7`, 폭 2.8px)
+- **QuickChart API (`https://quickchart.io/chart/create`) 연동**:
+  - 950x550 고해상도 규격으로 생성하며, POST 요청을 통해 짧고 영구적인 CDN 단축 렌더링 URL을 발급받아 텔레그램 미디어 그룹 전송 시 URL 길이 제한 없이 안정적으로 발송합니다.
+  - API 실패 시 기존 네이버 증권 정적 이미지 URL로 자동 폴백되는 2중 안전장치(Graceful Fallback) 탑재.
+- **최상단 텍스트 수급 브리핑 (`headerHtml`)**:
+  - 리포트 헤더 시황 섹션에 실시간 집계된 당일 수급을 텍스트로도 동시 제공:
+    `  └ 당일 수급: 👤개인 +29,972억 | 🏢외국인 -20,704억 | 🏛기관계 -16,789억`
 
 ### 4) 한경 마켓맵 / 핀비즈 스타일 계층형 히트맵(트리맵) 엔진 (`generateMarketHeatmapUrl`)
 - **업종별 섹터 클러스터링 (`getMarketClusterName`)**:

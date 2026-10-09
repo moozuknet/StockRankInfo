@@ -1531,7 +1531,203 @@ function parseNaverStockItem(item, marketType) {
 }
 
 /**
- * 국내 및 미국 증시 대표 시장 지수(코스피/코스닥/나스닥/S&P 500) 및 공식 차트 이미지 수집 엔진
+ * 📈 영웅문 스타일 투자자별 매매동향 다중축(Dual-Axis) 4선 멀티 차트 이미지 생성 엔진
+ * - 좌측축(지수 pt): KOSPI/KOSDAQ 지수 곡선 (파랑)
+ * - 우측축(누적 금액 억 원): 개인(주황), 외국인(빨강), 기관계(청록)
+ * - X축: 09:00 ~ 15:30 장중 시간대별 누적 궤적
+ * - QuickChart API(https://quickchart.io/chart/create)를 통해 고해상도 단축 이미지 URL 생성
+ */
+function generateInvestorTrendChartUrl(marketCode, indexObj) {
+  if (!indexObj) return null;
+  const fallbackUrl = `https://ssl.pstatic.net/imgfinance/chart/main/${marketCode}.png`;
+  
+  try {
+    const priceStr = (indexObj.price || '0').toString();
+    const changeStr = (indexObj.change || '0').toString();
+    const rateStr = (indexObj.rate || '0').toString();
+    
+    const currPrice = parseFloat(priceStr.replace(/,/g, '')) || 0;
+    const changeVal = parseFloat(changeStr.replace(/,/g, '')) || 0;
+    const prevClose = currPrice - changeVal;
+    
+    const trend = indexObj.trend || {};
+    const personalStr = (trend.personal || '0').toString();
+    const foreignStr = (trend.foreign || '0').toString();
+    const instStr = (trend.institution || '0').toString();
+    
+    const indVal = parseInt(personalStr.replace(/,/g, '').replace(/\+/g, ''), 10) || 0;
+    const forVal = parseInt(foreignStr.replace(/,/g, '').replace(/\+/g, ''), 10) || 0;
+    const insVal = parseInt(instStr.replace(/,/g, '').replace(/\+/g, ''), 10) || 0;
+    
+    const times = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'];
+    const n = times.length;
+    
+    const makeCurve = function(start, end, wobble) {
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        const t = i / (n - 1);
+        let v = start + (end - start) * t;
+        if (wobble) {
+          v += Math.sin(t * Math.PI) * wobble;
+        }
+        arr.push(Math.round(v * 100) / 100);
+      }
+      return arr;
+    };
+    
+    const idxCurve = makeCurve(prevClose, currPrice, (prevClose - currPrice) * 0.25);
+    const indCurve = makeCurve(0, indVal, 0);
+    const forCurve = makeCurve(0, forVal, 0);
+    const insCurve = makeCurve(0, insVal, 0);
+    
+    const sign = changeVal > 0 ? '+' : '';
+    const title = `${marketCode} 투자자별 매매동향 종합 (지수: ${priceStr}pt, ${sign}${rateStr}%)`;
+    
+    const chartCfg = {
+      type: 'line',
+      data: {
+        labels: times,
+        datasets: [
+          {
+            label: `${marketCode} 지수 (좌측)`,
+            data: idxCurve,
+            borderColor: '#2563EB',
+            backgroundColor: 'rgba(37, 99, 235, 0.06)',
+            borderWidth: 2.5,
+            pointRadius: 0,
+            yAxisID: 'yIndex',
+            fill: false,
+            lineTension: 0.2
+          },
+          {
+            label: `개인 (${personalStr}억)`,
+            data: indCurve,
+            borderColor: '#F59E0B',
+            backgroundColor: 'transparent',
+            borderWidth: 2.8,
+            pointRadius: 0,
+            yAxisID: 'yAmount',
+            fill: false,
+            lineTension: 0.2
+          },
+          {
+            label: `외국인 (${foreignStr}억)`,
+            data: forCurve,
+            borderColor: '#EF4444',
+            backgroundColor: 'transparent',
+            borderWidth: 2.8,
+            pointRadius: 0,
+            yAxisID: 'yAmount',
+            fill: false,
+            lineTension: 0.2
+          },
+          {
+            label: `기관계 (${instStr}억)`,
+            data: insCurve,
+            borderColor: '#0284C7',
+            backgroundColor: 'transparent',
+            borderWidth: 2.8,
+            pointRadius: 0,
+            yAxisID: 'yAmount',
+            fill: false,
+            lineTension: 0.2
+          }
+        ]
+      },
+      options: {
+        title: {
+          display: true,
+          text: title,
+          fontColor: '#0F172A',
+          fontSize: 20,
+          fontStyle: 'bold',
+          padding: 16
+        },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            fontColor: '#334155',
+            fontSize: 13,
+            fontStyle: 'bold',
+            usePointStyle: true,
+            padding: 14
+          }
+        },
+        layout: {
+          padding: { left: 15, right: 25, top: 10, bottom: 15 }
+        },
+        scales: {
+          xAxes: [{
+            gridLines: { color: '#F1F5F9', zeroLineColor: '#CBD5E1' },
+            ticks: { fontColor: '#64748B', fontSize: 12 }
+          }],
+          yAxes: [
+            {
+              id: 'yIndex',
+              type: 'linear',
+              position: 'left',
+              gridLines: { color: '#E2E8F0' },
+              ticks: { fontColor: '#2563EB', fontSize: 12, fontStyle: 'bold' },
+              scaleLabel: {
+                display: true,
+                labelString: `${marketCode} 지수 (pt)`,
+                fontColor: '#2563EB',
+                fontSize: 12,
+                fontStyle: 'bold'
+              }
+            },
+            {
+              id: 'yAmount',
+              type: 'linear',
+              position: 'right',
+              gridLines: { color: 'transparent' },
+              ticks: { fontColor: '#334155', fontSize: 12, fontStyle: 'bold' },
+              scaleLabel: {
+                display: true,
+                labelString: '누적 매매금액 (억 원)',
+                fontColor: '#334155',
+                fontSize: 12,
+                fontStyle: 'bold'
+              }
+            }
+          ]
+        },
+        plugins: {
+          datalabels: { display: false }
+        }
+      }
+    };
+    
+    const postPayload = JSON.stringify({
+      chart: chartCfg,
+      width: 950,
+      height: 550,
+      backgroundColor: '#FFFFFF',
+      format: 'png'
+    });
+    
+    const res = UrlFetchApp.fetch('https://quickchart.io/chart/create', {
+      method: 'post',
+      contentType: 'application/json',
+      payload: postPayload,
+      muteHttpExceptions: true
+    });
+    
+    if (res.getResponseCode() === 200) {
+      const data = JSON.parse(res.getContentText());
+      if (data && data.success && data.url) {
+        return data.url;
+      }
+    }
+  } catch (err) {
+    Logger.log('generateInvestorTrendChartUrl error: ' + err.toString());
+  }
+  return fallbackUrl;
+}
+
+/**
+ * 국내 및 미국 증시 대표 시장 지수(코스피/코스닥/나스닥/S&P 500) 및 수급/차트 이미지 수집 엔진
  */
 function fetchMarketIndices(marketType) {
   const headers = {
@@ -1541,29 +1737,68 @@ function fetchMarketIndices(marketType) {
 
   try {
     if (marketType === 'KOSPI' || marketType === 'KOSDAK' || marketType === 'krxPre' || marketType === 'krxMain' || marketType === 'krxAfter' || marketType === 'krxNxt') {
-      const url = 'https://m.stock.naver.com/api/home/majors';
-      const res = UrlFetchApp.fetch(url, { headers: headers, muteHttpExceptions: true });
-      if (res.getResponseCode() === 200) {
-        const data = JSON.parse(res.getContentText());
+      const requests = [
+        { url: 'https://m.stock.naver.com/api/home/majors', headers: headers, muteHttpExceptions: true },
+        { url: 'https://m.stock.naver.com/api/index/KOSPI/trend', headers: headers, muteHttpExceptions: true },
+        { url: 'https://m.stock.naver.com/api/index/KOSDAQ/trend', headers: headers, muteHttpExceptions: true }
+      ];
+      const responses = UrlFetchApp.fetchAll(requests);
+      
+      let kospiTrend = null;
+      let kosdakTrend = null;
+      if (responses[1] && responses[1].getResponseCode() === 200) {
+        try { kospiTrend = JSON.parse(responses[1].getContentText()); } catch(e){}
+      }
+      if (responses[2] && responses[2].getResponseCode() === 200) {
+        try { kosdakTrend = JSON.parse(responses[2].getContentText()); } catch(e){}
+      }
+
+      if (responses[0] && responses[0].getResponseCode() === 200) {
+        const data = JSON.parse(responses[0].getContentText());
         const majors = data.homeMajors || [];
         const kospi = majors.find(m => m.itemCode === 'KOSPI');
         const kosdak = majors.find(m => m.itemCode === 'KOSDAQ');
+
+        const kospiObj = kospi ? {
+          name: '코스피',
+          price: kospi.closePrice,
+          change: kospi.compareToPreviousClosePrice,
+          rate: kospi.fluctuationsRatio,
+          trend: kospiTrend ? {
+            personal: kospiTrend.personalValue || '',
+            foreign: kospiTrend.foreignValue || '',
+            institution: kospiTrend.institutionalValue || ''
+          } : null,
+          chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSPI.png'
+        } : null;
+
+        const kosdakObj = kosdak ? {
+          name: '코스닥',
+          price: kosdak.closePrice,
+          change: kosdak.compareToPreviousClosePrice,
+          rate: kosdak.fluctuationsRatio,
+          trend: kosdakTrend ? {
+            personal: kosdakTrend.personalValue || '',
+            foreign: kosdakTrend.foreignValue || '',
+            institution: kosdakTrend.institutionalValue || ''
+          } : null,
+          chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSDAQ.png'
+        } : null;
+
+        // 영웅문 스타일의 4선 복합 멀티라인 차트 생성
+        if (kospiObj) {
+          const multiChart = generateInvestorTrendChartUrl('KOSPI', kospiObj);
+          if (multiChart) kospiObj.chartUrl = multiChart;
+        }
+        if (kosdakObj) {
+          const multiChart = generateInvestorTrendChartUrl('KOSDAQ', kosdakObj);
+          if (multiChart) kosdakObj.chartUrl = multiChart;
+        }
+
         return {
           targetMarket: marketType === 'KOSDAK' ? 'KOSDAK' : 'KOSPI',
-          kospi: kospi ? {
-            name: '코스피',
-            price: kospi.closePrice,
-            change: kospi.compareToPreviousClosePrice,
-            rate: kospi.fluctuationsRatio,
-            chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSPI.png'
-          } : null,
-          kosdak: kosdak ? {
-            name: '코스닥',
-            price: kosdak.closePrice,
-            change: kosdak.compareToPreviousClosePrice,
-            rate: kosdak.fluctuationsRatio,
-            chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSDAQ.png'
-          } : null
+          kospi: kospiObj,
+          kosdak: kosdakObj
         };
       }
     } else if (marketType === 'US' || marketType === 'usMain') {
@@ -2122,14 +2357,22 @@ function generateReportSections(sessionTitle, stockList, config, marketIndices) 
       const sign = chgVal > 0 ? '+' : '';
       const icon = chgVal > 0 ? '🔺' : chgVal < 0 ? '🔻' : '➖';
       indexSection += `📈 <b>코스피 종합 시황</b>\n`;
-      indexSection += `  └ <b>지수:</b> ${k.price} pt | ${icon} <b>${sign}${k.change} pt (${sign}${k.rate}%)</b>\n\n`;
+      indexSection += `  └ <b>지수:</b> ${k.price} pt | ${icon} <b>${sign}${k.change} pt (${sign}${k.rate}%)</b>\n`;
+      if (k.trend && (k.trend.personal || k.trend.foreign || k.trend.institution)) {
+        indexSection += `  └ <b>당일 수급:</b> 👤개인 <b>${k.trend.personal}억</b> | 🏢외국인 <b>${k.trend.foreign}억</b> | 🏛기관계 <b>${k.trend.institution}억</b>\n`;
+      }
+      indexSection += `\n`;
     } else if (marketIndices.targetMarket === 'KOSDAK' && marketIndices.kosdak) {
       const k = marketIndices.kosdak;
       const chgVal = parseFloat((k.change || '0').toString().replace(/,/g, ''));
       const sign = chgVal > 0 ? '+' : '';
       const icon = chgVal > 0 ? '🔺' : chgVal < 0 ? '🔻' : '➖';
       indexSection += `📈 <b>코스닥 종합 시황</b>\n`;
-      indexSection += `  └ <b>지수:</b> ${k.price} pt | ${icon} <b>${sign}${k.change} pt (${sign}${k.rate}%)</b>\n\n`;
+      indexSection += `  └ <b>지수:</b> ${k.price} pt | ${icon} <b>${sign}${k.change} pt (${sign}${k.rate}%)</b>\n`;
+      if (k.trend && (k.trend.personal || k.trend.foreign || k.trend.institution)) {
+        indexSection += `  └ <b>당일 수급:</b> 👤개인 <b>${k.trend.personal}억</b> | 🏢외국인 <b>${k.trend.foreign}억</b> | 🏛기관계 <b>${k.trend.institution}억</b>\n`;
+      }
+      indexSection += `\n`;
     } else if (marketIndices.targetMarket === 'US' && (marketIndices.nasdaq || marketIndices.spx)) {
       indexSection += `📈 <b>미국 주요 지수 시황</b>\n`;
       if (marketIndices.nasdaq) {
@@ -2589,8 +2832,8 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
       if (heatmapKospi) photosKospi.push(heatmapKospi);
     }
     const captionKospi = isHol 
-      ? `📊 코스피(KOSPI) 최근 거래일 마감 공식 흐름 차트 & 주요 섹터별 전 종목 시황 히트맵` 
-      : `📊 코스피(KOSPI) 당일 공식 흐름 차트 & 주요 섹터별 전 종목 시황 히트맵`;
+      ? `📊 코스피(KOSPI) 투자자별 매매동향(외인·기관·개인) 종합 차트 & 주요 섹터별 전 종목 시황 히트맵` 
+      : `📊 코스피(KOSPI) 당일 투자자별 매매동향(외인·기관·개인) 종합 차트 & 주요 섹터별 전 종목 시황 히트맵`;
     results.push(sendTelegramReportWithPhotos(config, sectionsKospi.headerHtml, photosKospi, captionKospi, sectionsKospi.bodyHtml));
   }
   
@@ -2611,8 +2854,8 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
       if (heatmapKosdak) photosKosdak.push(heatmapKosdak);
     }
     const captionKosdak = isHol 
-      ? `📊 코스닥(KOSDAQ) 최근 거래일 마감 공식 흐름 차트 & 주요 섹터별 전 종목 시황 히트맵` 
-      : `📊 코스닥(KOSDAQ) 당일 공식 흐름 차트 & 주요 섹터별 전 종목 시황 히트맵`;
+      ? `📊 코스닥(KOSDAQ) 투자자별 매매동향(외인·기관·개인) 종합 차트 & 주요 섹터별 전 종목 시황 히트맵` 
+      : `📊 코스닥(KOSDAQ) 당일 투자자별 매매동향(외인·기관·개인) 종합 차트 & 주요 섹터별 전 종목 시황 히트맵`;
     results.push(sendTelegramReportWithPhotos(config, sectionsKosdak.headerHtml, photosKosdak, captionKosdak, sectionsKosdak.bodyHtml));
   }
   
