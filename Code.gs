@@ -1558,79 +1558,180 @@ function generateInvestorTrendChartUrl(marketCode, indexObj) {
     const indVal = parseInt(personalStr.replace(/,/g, '').replace(/\+/g, ''), 10) || 0;
     const forVal = parseInt(foreignStr.replace(/,/g, '').replace(/\+/g, ''), 10) || 0;
     const insVal = parseInt(instStr.replace(/,/g, '').replace(/\+/g, ''), 10) || 0;
-    
-    const times = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'];
-    const n = times.length;
-    
+
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      'Referer': `https://stock.naver.com/domestic/index/${marketCode}`
+    };
+
+    // 1. 실제 장중 1분봉 가격 시계열 (393개 포인트)
+    const priceReq = {
+      url: `https://stock.naver.com/api/securityService/chart/domestic/index/${marketCode}?periodType=day`,
+      headers: headers,
+      muteHttpExceptions: true
+    };
+
+    // 2. 실제 장중 시간대별 투자자 수급 시계열 (09:00~15:30 구간 포함하는 페이지 3~8)
+    const trendReqs = [3, 4, 5, 6, 7, 8].map(startIdx => ({
+      url: `https://stock.naver.com/api/domestic/market/trend/time?tradeType=KRX&marketType=${marketCode}&startIdx=${startIdx}&pageSize=50&segmentType=TIME`,
+      headers: headers,
+      muteHttpExceptions: true
+    }));
+
+    const batchRes = UrlFetchApp.fetchAll([priceReq, ...trendReqs]);
+
+    let priceInfos = [];
+    if (batchRes[0] && batchRes[0].getResponseCode() === 200) {
+      try {
+        const pd = JSON.parse(batchRes[0].getContentText());
+        priceInfos = pd.priceInfos || [];
+      } catch (e) {}
+    }
+
+    let allTrendItems = [];
+    for (let i = 1; i < batchRes.length; i++) {
+      if (batchRes[i] && batchRes[i].getResponseCode() === 200) {
+        try {
+          const td = JSON.parse(batchRes[i].getContentText());
+          if (Array.isArray(td.content)) {
+            allTrendItems = allTrendItems.concat(td.content);
+          }
+        } catch (e) {}
+      }
+    }
+
+    const regTrend = allTrendItems.filter(it => it.time && it.time >= '090000' && it.time <= '153000');
+    regTrend.sort((a, b) => a.time.localeCompare(b.time));
+
+    const extractFlow = function(item) {
+      let ind = 0, foreign = 0, inst = 0;
+      if (!item || !Array.isArray(item.netAmounts)) return { ind: 0, foreign: 0, inst: 0 };
+      item.netAmounts.forEach(na => {
+        const g = na.investorGubun;
+        const val = Math.round((parseInt(na.diffValue || '0', 10) || 0) / 100000000); // 억 원 단위
+        if (g === '8000') ind += val;
+        else if (g === '9000' || g === '9001') foreign += val;
+        else if (['1000', '2000', '3000', '3100', '4000', '5000', '6000'].indexOf(g) !== -1) inst += val;
+      });
+      return { ind: ind, foreign: foreign, inst: inst };
+    };
+
+    const targetTimes = [
+      '090000', '093000', '100000', '103000', '110000', '113000',
+      '120000', '123000', '130000', '133000', '140000', '143000', '150000', '153000'
+    ];
+
+    const labels = [];
+    const realIndex = [];
+    const realInd = [];
+    const realFor = [];
+    const realIns = [];
+
+    targetTimes.forEach(tStr => {
+      const label = tStr.substring(0, 2) + ':' + tStr.substring(2, 4);
+      labels.push(label);
+
+      // 실제 지수 매칭
+      if (priceInfos.length > 0) {
+        const pCands = priceInfos.filter(p => p.localDateTime && p.localDateTime.slice(-6) <= tStr);
+        if (pCands.length > 0) {
+          realIndex.push(Math.round(pCands[pCands.length - 1].currentPrice * 100) / 100);
+        } else {
+          realIndex.push(Math.round(priceInfos[0].currentPrice * 100) / 100);
+        }
+      }
+
+      // 실제 투자자 수급 매칭
+      if (regTrend.length > 0) {
+        const tCands = regTrend.filter(tr => tr.time <= tStr);
+        const targetItem = tCands.length > 0 ? tCands[tCands.length - 1] : regTrend[0];
+        const flows = extractFlow(targetItem);
+        realInd.push(flows.ind);
+        realFor.push(flows.foreign);
+        realIns.push(flows.inst);
+      }
+    });
+
+    // 폴백용 보간 곡선 (데이터가 전혀 없을 때만 활용)
+    const n = targetTimes.length;
     const makeCurve = function(start, end, wobble) {
       const arr = [];
       for (let i = 0; i < n; i++) {
         const t = i / (n - 1);
         let v = start + (end - start) * t;
-        if (wobble) {
-          v += Math.sin(t * Math.PI) * wobble;
-        }
+        if (wobble) v += Math.sin(t * Math.PI) * wobble;
         arr.push(Math.round(v * 100) / 100);
       }
       return arr;
     };
-    
-    const idxCurve = makeCurve(prevClose, currPrice, (prevClose - currPrice) * 0.25);
-    const indCurve = makeCurve(0, indVal, 0);
-    const forCurve = makeCurve(0, forVal, 0);
-    const insCurve = makeCurve(0, insVal, 0);
-    
+    const fallbackIdx = makeCurve(prevClose, currPrice, (prevClose - currPrice) * 0.25);
+    const fallbackInd = makeCurve(0, indVal, 0);
+    const fallbackFor = makeCurve(0, forVal, 0);
+    const fallbackIns = makeCurve(0, insVal, 0);
+
+    const plotIndex = realIndex.length === n ? realIndex : fallbackIdx;
+    const plotInd = realInd.length === n ? realInd : fallbackInd;
+    const plotFor = realFor.length === n ? realFor : fallbackFor;
+    const plotIns = realIns.length === n ? realIns : fallbackIns;
+
+    const lastInd = plotInd[plotInd.length - 1];
+    const lastFor = plotFor[plotFor.length - 1];
+    const lastIns = plotIns[plotIns.length - 1];
+
+    const indSign = lastInd >= 0 ? '+' : '';
+    const forSign = lastFor >= 0 ? '+' : '';
+    const insSign = lastIns >= 0 ? '+' : '';
     const sign = changeVal > 0 ? '+' : '';
     const title = `${marketCode} 투자자별 매매동향 종합 (지수: ${priceStr}pt, ${sign}${rateStr}%)`;
     
     const chartCfg = {
       type: 'line',
       data: {
-        labels: times,
+        labels: labels,
         datasets: [
           {
             label: `${marketCode} 지수 (좌측)`,
-            data: idxCurve,
+            data: plotIndex,
             borderColor: '#2563EB',
-            backgroundColor: 'rgba(37, 99, 235, 0.06)',
-            borderWidth: 2.5,
+            backgroundColor: 'rgba(37, 99, 235, 0.08)',
+            borderWidth: 2.4,
             pointRadius: 0,
             yAxisID: 'yIndex',
             fill: false,
-            lineTension: 0.2
+            lineTension: 0.15
           },
           {
-            label: `개인 (${personalStr}억)`,
-            data: indCurve,
+            label: `개인 (${indSign}${lastInd.toLocaleString()}억)`,
+            data: plotInd,
             borderColor: '#F59E0B',
             backgroundColor: 'transparent',
-            borderWidth: 2.8,
+            borderWidth: 2.6,
             pointRadius: 0,
             yAxisID: 'yAmount',
             fill: false,
-            lineTension: 0.2
+            lineTension: 0.15
           },
           {
-            label: `외국인 (${foreignStr}억)`,
-            data: forCurve,
+            label: `외국인 (${forSign}${lastFor.toLocaleString()}억)`,
+            data: plotFor,
             borderColor: '#EF4444',
             backgroundColor: 'transparent',
-            borderWidth: 2.8,
+            borderWidth: 2.6,
             pointRadius: 0,
             yAxisID: 'yAmount',
             fill: false,
-            lineTension: 0.2
+            lineTension: 0.15
           },
           {
-            label: `기관계 (${instStr}억)`,
-            data: insCurve,
+            label: `기관계 (${insSign}${lastIns.toLocaleString()}억)`,
+            data: plotIns,
             borderColor: '#0284C7',
             backgroundColor: 'transparent',
-            borderWidth: 2.8,
+            borderWidth: 2.6,
             pointRadius: 0,
             yAxisID: 'yAmount',
             fill: false,
-            lineTension: 0.2
+            lineTension: 0.15
           }
         ]
       },
