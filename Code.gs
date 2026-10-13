@@ -1571,8 +1571,8 @@ function generateInvestorTrendChartUrl(marketCode, indexObj) {
       muteHttpExceptions: true
     };
 
-    // 2. 실제 장중 시간대별 투자자 수급 시계열 (09:00~15:30 구간 포함하는 페이지 3~8)
-    const trendReqs = [3, 4, 5, 6, 7, 8].map(startIdx => ({
+    // 2. 실제 장중 시간대별 투자자 수급 시계열 (09:00 개장부터 15:30까지 전 구간 커버를 위해 startIdx 0부터 3까지 총 200개 아이템 수집)
+    const trendReqs = [0, 1, 2, 3].map(startIdx => ({
       url: `https://stock.naver.com/api/domestic/market/trend/time?tradeType=KRX&marketType=${marketCode}&startIdx=${startIdx}&pageSize=50&segmentType=TIME`,
       headers: headers,
       muteHttpExceptions: true
@@ -1820,6 +1820,8 @@ function generateInvestorTrendChartUrl(marketCode, indexObj) {
       if (data && data.success && data.url) {
         return data.url;
       }
+    } else {
+      Logger.log(`[QuickChart] ${marketCode} 생성 실패: HTTP ${res.getResponseCode()} - ${res.getContentText()}`);
     }
   } catch (err) {
     Logger.log('generateInvestorTrendChartUrl error: ' + err.toString());
@@ -2777,8 +2779,10 @@ function sendTelegramReportWithPhotos(config, headerHtml, photoUrls, photoCaptio
   const errors = [];
   
   // 텔레그램 이미지 캐싱 방지를 위해 timestamp 파라미터 부착 (매 발송마다 최신 차트 로드 보장)
+  // 단, QuickChart 단축 렌더 URL(quickchart.io)은 고유 해시 ID를 가지며 쿼리 파라미터 부착 시 HTTP 400 Bad Request가 발생하므로 원본 유지
   const cacheBustedPhotos = (photoUrls || []).map(url => {
     if (!url) return url;
+    if (url.indexOf('quickchart.io') !== -1) return url;
     const separator = url.includes('?') ? '&' : '?';
     return `${url}${separator}t=${new Date().getTime()}`;
   });
