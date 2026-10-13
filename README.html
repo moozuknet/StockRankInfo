@@ -2,6 +2,7 @@
 <html>
 <head>
   <base target="_top">
+  <meta charset="utf-8">
   <title>README - 증시 시가총액 변동 분석 & 텔레그램 자동 발송</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; line-height: 1.6; max-width: 960px; margin: 0 auto; }
@@ -16,47 +17,73 @@
     .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-right: 6px; }
     .badge-blue { background: #1d4ed8; color: #fff; }
     .badge-green { background: #15803d; color: #fff; }
+    img { max-width: 100%; border-radius: 12px; border: 1px solid #334155; margin: 12px 0; }
   </style>
 </head>
 <body>
   <h1>📊 README - 증시 시가총액 변동 분석 &amp; 텔레그램 자동 발송 웹 UI</h1>
   <div>
-    <span class="badge badge-blue">v2.5.0 Release</span>
+    <span class="badge badge-blue">v3.3.2 Release</span>
     <span class="badge badge-green">Google Apps Script</span>
   </div>
   <p><b>Google Apps Script(GAS)</b>와 <b>Modern TailwindCSS Web UI</b> 기반으로 개발된 한국 증시(NXT 프리마켓 / KRX·NXT 정규장 / 통합 애프터마켓) 및 미국 증시(US 본장) 시가총액 변동 자동 분석 및 텔레그램 리포팅 시스템입니다.</p>
 
-  <h2>📸 대시보드 스크린샷 (Web App UI)</h2>
-  <p style="color: #94a3b8; font-size: 13px;">💡 <b>v2.5.0 최신 대시보드 화면:</b> KOSPI/KOSDAK 독립 수신, 4대 시장 세션 스케줄러, WICS 섹터 및 <b>최고점 대비 등락률(고점 대비 +,-%) 표기 옵션</b>이 모두 반영된 최신 UI 화면입니다.</p>
-  <p><img src="assets/dashboard_preview.png" alt="웹 대시보드 미리보기" style="max-width: 100%; border-radius: 12px; border: 1px solid #334155; margin: 12px 0;"></p>
+  <h2>📸 대시보드 &amp; 시황 멀티 차트 / 히트맵 스크린샷</h2>
+
+  <h3>1) 투자자별 매매동향 종합 멀티라인 차트 (v3.3.2 최신)</h3>
+  <p style="color: #94a3b8; font-size: 13px;">💡 <b>영웅문 [0251] 스타일 다중축(Dual-Axis) 4선 복합 차트:</b> 좌측축(지수 pt)과 우측축(누적 금액 억 원) 위에 KOSPI/KOSDAQ 지수(파랑), 개인(주황), 외국인(빨강), 기관계(청록) 4개 곡선을 장중 시간대별(09:00~15:30 전 구간 200개 시계열)로 완벽히 재현하여 지수 흐름과 수급 주체의 방향성을 100% 동일하게 한눈에 파악합니다.</p>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align: center;">코스피(KOSPI) 투자자별 종합 차트</th>
+        <th style="text-align: center;">코스닥(KOSDAQ) 투자자별 종합 차트</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="text-align: center;"><img src="assets/preview_option2_multiline_chart.png" alt="코스피 수급 멀티 차트"></td>
+        <td style="text-align: center;"><img src="assets/preview_kosdaq_trend.png" alt="코스닥 수급 멀티 차트"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>2) 웹 설정 대시보드 (Web App UI)</h3>
+  <p style="color: #94a3b8; font-size: 13px;">💡 <b>v3.3.2 최신 대시보드 화면:</b> KOSPI/KOSDAQ 독립 수신, 4대 시장 세션 스케줄러, WICS 섹터 및 최고점 대비 등락률(고점 대비 +,-%) 표기 옵션이 반영된 반응형 UI입니다.</p>
+  <p><img src="assets/dashboard_preview.png" alt="웹 대시보드 미리보기"></p>
+
+  <h3>3) 코스피 / 코스닥 주요 섹터별 전 종목 히트맵 (1200x1200 HD)</h3>
+  <p style="color: #94a3b8; font-size: 13px;">💡 <b>한경 마켓맵 / 핀비즈 스타일 계층형 트리맵:</b> 섹터별 클러스터링과 크고 굵은 종목명 폰트(최대 38pt BOLD)가 적용된 초고해상도 히트맵입니다.</p>
+  <p><img src="assets/market_heatmap_sample.png" alt="코스피 시황 히트맵"></p>
 
   <h2>🌟 핵심 기능 요약</h2>
   <ol>
-    <li><b>📱 Web UI 설정 대시보드 (`Index.html`)</b>
+    <li><b>📈 최상단 지수 종합 시황 및 영웅문 스타일 수급 멀티 차트 연동 (v3.3.2)</b>
       <ul>
-        <li><b>코스피(KOSPI) &amp; 코스닥(KOSDAK) 분리 수신 설정 (v2.4+):</b> 국내 시장 분석 시 코스피와 코스닥을 구분하여 독립적인 상위 종목 및 섹터 리포트 수신 가능.</li>
-        <li><b>종목별 WICS 표준 섹터(업종) 정보 제공 (v2.4+):</b> 79개 WICS 표준 업종 코드 체계(<code>NAVER_INDUSTRY_MAP</code>) 연동 및 대형주 팩트 섹터 캐시 탑재.</li>
-        <li><b>텔레그램 다중 Bot 연동 관리 (v2.1+):</b> 여러 개의 텔레그램 봇 등록 및 활성/비활성 제어.</li>
-        <li><b>2026.09.14 개편 시장별 4대 시간대별 발송 제어 (v2.3+):</b>
-          <ul>
-            <li>🌅 <b>국내 프리마켓 마감 (평일 08:55 KST):</b> NXT 장전 프리마켓(08:00~08:50) 마감 및 개장 준비 브리핑.</li>
-            <li>📊 <b>국내 정규장 마감 (평일 15:35 KST):</b> KRX &amp; NXT 정규 메인마켓(09:00~15:30) 종가 확정 후 코스피/코스닥 마감 시총 분석.</li>
-            <li>🌙 <b>국내 통합 애프터마켓 마감 (평일 20:05 KST):</b> KRX(16:00~20:00) &amp; NXT(15:40~20:00) 실시간 접속매매 최종 마감 분석.</li>
-            <li>🇺🇸 <b>미국 본장 마감 (화~토 05:05/06:05 KST):</b> NYSE &amp; NASDAQ 본장 마감 및 서머타임 연동 분석.</li>
-          </ul>
-        </li>
-        <li><b>실시간 리포트 미리보기 시장 전환 탭:</b> KOSPI / KOSDAK / US 실시간 데이터 수집 및 텔레그램 모달 팝업 미리보기.</li>
-        <li><b>최고점 대비 등락률(%) 표기 서식 (v2.5+):</b> 각 종목별 최고가(52주 최고가) 대비 현재가 등락률(+,-%) 및 최고가 금액을 상세 리포트에 동적 표기(<code>showHighDiff</code>).</li>
-        <li><b>실시간 장운영 상태 안내 위젯:</b> 4대 시장의 실시간 개장/대기/마감 상태 대시보드 표시.</li>
+        <li><b>지수 요약 및 당일 수급 브리핑:</b> <code>👤개인 +29,972억 | 🏢외국인 -20,704억 | 🏛기관계 -16,789억</code> 실시간 순매수/순매도 누적 금액 최상단 표기.</li>
+        <li><b>영웅문 [0251] 스타일 다중축 4선 복합 차트:</b> 지수(좌측축)와 3대 수급 주체(우측축) 동시 렌더링.</li>
+        <li><b>장중 1분봉 및 시간대별 수급 100% 동일 동기화:</b> 네이버 시계열 API(startIdx 0~3, 총 200개 아이템) 연동으로 09:00~15:30 전 구간 수급 곡선 일치.</li>
+        <li><b>텔레그램 전송 안정성 최적화:</b> QuickChart 단축 URL 쿼리 파라미터 충돌(HTTP 400) 방지 및 네이버 차트 자동 폴백 탑재.</li>
       </ul>
     </li>
-    <li><b>⚙️ 백엔드 데이터 처리 &amp; 자동화 (`Code.gs`)</b>
+    <li><b>🗺️ 한경 마켓맵 / 핀비즈 스타일 계층형 히트맵 엔진 (v3.2+)</b>
       <ul>
-        <li><b>코스피 / 코스닥 독립 Top N 파이프라인:</b> 시장별 독립 상위 종목 수집 및 순차 발송.</li>
-        <li><b>2계층 하이브리드 섹터 조회 엔진:</b> 대형주 팩트 캐시(Layer 1, 0ms) + 실시간 네이버 모바일 통합 API 조회(Layer 2).</li>
-        <li><b>2026.09.14 KRX/NXT 최신 운영시간 반영:</b> 시간외단일가 폐지 및 애프터마켓 실시간 접속매매 전환에 맞춘 정밀 스케줄링.</li>
-        <li><b>휴장일 판별 하이브리드 엔진:</b> 대한민국 공휴일, 근로자의 날, 연말 결산 휴장일 및 미국 증시 공휴일 자동 건너뛰기.</li>
-        <li><b>미국 서머타임(DST) 자동 처리:</b> EDT(05:05 KST) / EST(06:05 KST) 자동 전환.</li>
+        <li><b>업종별 섹터 클러스터링:</b> 전기·전자, 2차전지·화학, 제약·바이오 등 섹터별 주도주 타일링.</li>
+        <li><b>크고 굵은 종목명 폰트 분리:</b> 대형주 최대 38pt BOLD, 일반 종목 최소 16pt 이상 가독성 확보.</li>
+        <li><b>국내 증시 표준 7단계 정밀 컬러 그라데이션 및 1200x1200 HD 정사각 타일링.</b></li>
+      </ul>
+    </li>
+    <li><b>📱 3단계 스마트 순차 전송 파이프라인 (v3.0+)</b>
+      <ul>
+        <li>1단계: 헤더 &amp; 최상단 지수 종합 시황 및 당일 수급 브리핑 발송</li>
+        <li>2단계: 영웅문 스타일 4선 멀티 차트 + 고품질 전 종목 히트맵 묶음 사진 앨범(sendMediaGroup) 발송</li>
+        <li>3단계: 종목별 시가총액 순위 분석 &amp; 핵심 요약 리포트 본문 발송</li>
+      </ul>
+    </li>
+    <li><b>📱 Web UI 설정 대시보드 (`Index.html`)</b>
+      <ul>
+        <li>코스피 &amp; 코스닥 분리 수신 제어 및 WICS 표준 79개 섹터 정보 매핑.</li>
+        <li>텔레그램 다중 Bot 연동 및 2026.09.14 개편 시장별 4대 시간대별(프리마켓/정규장/애프터마켓/미국장) 발송 스케줄러.</li>
+        <li>휴장일 자동 제외, 최고점 대비 등락률(showHighDiff), 순위 급등/급락 분석 옵션.</li>
       </ul>
     </li>
   </ol>
@@ -100,42 +127,68 @@
   </table>
 
   <h2>📩 텔레그램 수신 메시지 예시</h2>
-  <p>텔레그램에서 수신되는 HTML 포맷 메시지의 최신 예시입니다:</p>
   <pre><code><b>[📊 국내 정규장 - 코스피(KOSPI) 마감 시총 분석]</b>
-🗓 <b>기준 일시:</b> 2026-10-02 15:35:00 (KST)
+🗓 <b>기준 일시:</b> 2026-10-13 15:35:00 (KST)
 📊 <b>조회 범위:</b> 상위 20개 종목
 📌 <b>순위 변동:</b> ▲ 상승 | ▼ 하락 | ➖ 유지
 📌 <b>강조 아이콘:</b> 🚀 10계단+ 급등 | 🔥 5계단+ 상승 | 🚨 10계단+ 급락
 ───────────────────
+📈 <b>코스피 종합 시황</b>
+  └ <b>지수:</b> 2,580.40 pt | 🔺 <b>+12.30 pt (+0.48%)</b>
+  └ <b>당일 수급:</b> 👤개인 <b>+29,972억</b> | 🏢외국인 <b>-20,704억</b> | 🏛기관계 <b>-16,789억</b>
+───────────────────
 
-#1 &lt;a href="https://finance.naver.com/item/main.naver?code=005930"&gt;삼성전자&lt;/a&gt; &lt;code&gt;(KOSPI · 반도체와반도체장비)&lt;/code&gt;
+#1 &lt;a href="https://finance.naver.com/item/main.naver?code=005930"&gt;삼성전자&lt;/a&gt; &lt;code&gt;(KOSPI · 전기 · 전자)&lt;/code&gt;
   └ 현재가: 274,500원 | 🔺 +2.43%
   └ 시가총액: 1,604조 8,035억원
   └ 고점 대비: -27.76% (최고 380,000원)
-  └ 과거 대비: 1일 전(유지 / +2.4% / 156조 7,190억원) | 5일 전(유지 / +4.2% / 154조 118억원) | 1개월 전(유지 / +8.4% / 148조 445억원) | 3개월 전(유지 / +12.5% / 142조 6,492억원) | 1년 전(유지 / +18.9% / 135조 0억원)
-
-#2 &lt;a href="https://finance.naver.com/item/main.naver?code=000660"&gt;SK하이닉스&lt;/a&gt; &lt;code&gt;(KOSPI · 반도체와반도체장비)&lt;/code&gt;
-  └ 현재가: 1,645,000원 | 🔺 +3.26%
-  └ 시가총액: 1,201조 6,599억원
-  └ 고점 대비: -45.20% (최고 3,002,000원)
-  └ 과거 대비: 1일 전(유지 / +3.3% / 116조 3,271억원) | 5일 전(유지 / +7.3% / 112조 0억원) | 1개월 전(유지 / +14.4% / 105조 0억원) | 3개월 전(유지 / +28.0% / 93조 8,796억원) | 1년 전(유지 / +46.5% / 82조 0억원)
+  └ 과거 대비: 1일 전(유지 / +2.4%) | 5일 전(유지 / +4.2%) | 1개월 전(유지 / +8.4%) | 3개월 전(유지 / +12.5%) | 1년 전(유지 / +18.9%)
 
 ... (중략) ...
 
 ───────────────────
 💡 <b>[선택 시점별 순위 급등/급락 핵심 요약]</b>
 ■ 1년 전 대비 순위 변동 요약:
-  • 최대 순위 급등: 두산에너빌리티 [기계] 🚀 (▲23계단 / +120.5% / 2조 4,000억원)
-  • 최대 순위 급락: LG화학 [화학] 🚨 (▼20계단 / -45.1% / 3조 9,000억원)
-  • 주요 순위 상승: 한화에어로스페이스(·우주항공과국방)(🚀 ▲14계단), 효성중공업(·전기장비)(🚀 ▲12계단)
-  • 주요 순위 하락: POSCO홀딩스(·철강)(🚨 ▼13계단), 포스코퓨처엠(·화학)(🚨 ▼11계단)
+  • 최대 순위 급등: 두산에너빌리티 [기계 · 방산] 🚀 (▲23계단 / +120.5% / 2조 4,000억원)
+  • 최대 순위 급락: LG화학 [2차전지 · 화학] 🚨 (▼20계단 / -45.1% / 3조 9,000억원)
+  • 주요 순위 상승: 한화에어로스페이스(기계 · 방산)(🚀 ▲14계단)
+  • 주요 순위 하락: POSCO홀딩스(철강 · 금속)(🚨 ▼13계단)</code></pre>
 
-■ 세션 수급 및 모멘텀 종합:
-  • 반도체/금융주 주도의 시총 상위 대형주 외인/기관 순매수 유입
-  • 밸류업 프로그램 연계 저PBR 및 고배당주 중심 강세 연장</code></pre>
+  <h2>🚀 버전별 주요 업데이트 내역 (Changelog)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 100px;">버전</th>
+        <th style="width: 120px;">출시 일자</th>
+        <th>주요 기능 및 변경사항</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>v3.3.2</b></td>
+        <td>2026-10-13</td>
+        <td>• <b>투자자 수급 4선 차트 텔레그램 전송 안정화:</b> QuickChart CDN 단축 URL 파라미터 충돌(HTTP 400 Bad Request) 방지를 위한 스마트 캐시버스팅 예외 처리 적용<br>• <b>장중 수급 데이터 전 구간(09:00~15:30) 동기화:</b> startIdx 0~3(총 200개 아이템) 시계열 수집 정상화로 영웅문 [0251] HTS와 100% 동일 곡선 일치</td>
+      </tr>
+      <tr>
+        <td><b>v3.3.1</b></td>
+        <td>2026-10-09</td>
+        <td>• <b>UI/스크린샷 갱신:</b> Web App 대시보드 버전 배지 v3.3.1 동기화 및 문서 캡처 이미지 최신화</td>
+      </tr>
+      <tr>
+        <td><b>v3.3.0</b></td>
+        <td>2026-10-08</td>
+        <td>• <b>영웅문 [0251] 스타일 다중축 4선 복합 차트 도입:</b> 좌측(지수 pt) + 우측(누적 수급 억 원) 4선(지수/개인/외국인/기관계) 렌더링<br>• <b>최상단 당일 3대 수급 텍스트 브리핑:</b> 네이버 공식 수급 API 연동을 통한 개인/외인/기관 순매수 금액 표기</td>
+      </tr>
+      <tr>
+        <td><b>v3.2.0</b></td>
+        <td>2026-10-06</td>
+        <td>• <b>한경 마켓맵 / 핀비즈 스타일 계층형 히트맵 엔진 구축:</b> 섹터별 클러스터링 및 시총 가중치 트리맵 타일링<br>• <b>굵은 종목명 폰트 최적화:</b> 대형주 최대 38pt BOLD 및 최소 16pt 이상 가독성 강화</td>
+      </tr>
+    </tbody>
+  </table>
 
   <h2>🔗 프로젝트 저장소 및 안내</h2>
   <p><b>GitHub 저장소:</b> <a href="https://github.com/moozuknet/StockRankInfo" style="color: #38bdf8;">https://github.com/moozuknet/StockRankInfo</a></p>
-  <p><b>개발 및 기술 가이드:</b> <a href="DEVELOPMENT_GUIDE.html" style="color: #38bdf8;">DEVELOPMENT_GUIDE.html</a> 참고</p>
+  <p><b>개발 및 기술 가이드:</b> <a href="DEVELOPMENT_GUIDE.md" style="color: #38bdf8;">DEVELOPMENT_GUIDE.md</a> 참고</p>
 </body>
 </html>
