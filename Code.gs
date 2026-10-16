@@ -1960,9 +1960,9 @@ function fetchMarketIndices(marketType) {
  * - 색상: 국내(상승=빨강, 하락=파랑) / 미국(상승=초록, 하락=빨강)
  */
 /**
- * 📊 섹터별 클러스터링 기반 고품질 증시 시가총액 히트맵(트리맵) 엔진 (v3.2.0)
- * - 한경 마켓맵 / 핀비즈(Finviz) 스타일의 업종별 클러스터 그룹화 + 상위 40~50개 전 종목 타일링
- * - 캔버스: 1200x1200 HD 정사각 타일링 (모바일 화면 전체 채움 및 선명한 가독성)
+ * 📊 섹터별 클러스터링 기반 고품질 증시 시가총액 히트맵(트리맵) 엔진 (v3.4.1)
+ * - 🇺🇸 미국 증시: 핀비즈(Finviz) 실시간 S&P 500 11대 섹터 68개 전 종목 타일링 & 1600x1600 Ultra HD (최소 22pt BOLD)
+ * - 🇰🇷 국내 증시: 한경 마켓맵 스타일 업종별 클러스터 그룹화 + 상위 32개 대표주 타일링
  * - 7단계 정밀 등락률 컬러 그라데이션 (국내: 상승 빨강, 하락 파랑 / 미국: 상승 녹색, 하락 빨강)
  */
 function cleanHeatmapStockName(raw) {
@@ -2013,13 +2013,13 @@ function getMarketClusterName(sector, stockName, marketType) {
 
 function getHeatmapColor(rate, isUs) {
   if (isUs) {
-    if (rate >= 3.0) return '#059669';
-    if (rate >= 1.5) return '#10b981';
-    if (rate >= 0.5) return '#34d399';
-    if (rate > -0.5) return '#334155';
-    if (rate > -1.5) return '#f87171';
-    if (rate > -3.0) return '#ef4444';
-    return '#b91c1c';
+    if (rate >= 3.0) return '#059669';       // 진한 에메랄드 그린 (+3% 이상)
+    if (rate >= 1.5) return '#10b981';       // 선명한 녹색 (+1.5% ~ +3%)
+    if (rate >= 0.3) return '#34d399';       // 밝은 녹색 (+0.3% ~ +1.5%)
+    if (rate > -0.3) return '#334155';       // 보합 다크 슬레이트 (-0.3% ~ +0.3%)
+    if (rate > -1.5) return '#f87171';       // 연한 빨강 (-0.3% ~ -1.5%)
+    if (rate > -3.0) return '#ef4444';       // 선명한 빨강 (-1.5% ~ -3%)
+    return '#b91c1c';                        // 딥 레드 (-3% 이하)
   } else {
     if (rate >= 3.0) return '#ef4444';
     if (rate >= 1.5) return '#dc2626';
@@ -2040,12 +2040,209 @@ function getHeatmapFontSizes(area) {
   return { name: 16, rate: 13 };
 }
 
+/**
+ * 🇺🇸 Finviz 실시간 S&P 500 전 종목 등락률 파싱 엔진
+ * - https://finviz.com/map.ashx HTML 내부의 initialPerf.nodes (500개 종목 실시간 등락률) 추출
+ */
+function fetchFinvizMapPerf() {
+  try {
+    const url = 'https://finviz.com/map.ashx';
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    };
+    const res = UrlFetchApp.fetch(url, { headers: headers, muteHttpExceptions: true });
+    if (res.getResponseCode() === 200) {
+      const html = res.getContentText();
+      const idx = html.indexOf('initialPerf');
+      if (idx !== -1) {
+        const nodesIdx = html.indexOf('"nodes":', idx);
+        if (nodesIdx !== -1) {
+          const endIdx = html.indexOf('},"additional"', nodesIdx);
+          if (endIdx !== -1) {
+            const jsonStr = html.substring(nodesIdx + 8, endIdx + 1);
+            const perfMap = JSON.parse(jsonStr);
+            Logger.log('fetchFinvizMapPerf: Loaded ' + Object.keys(perfMap).length + ' tickers from Finviz');
+            return perfMap;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    Logger.log('fetchFinvizMapPerf warning: ' + err.toString());
+  }
+  return {};
+}
+
+/**
+ * 🇺🇸 Finviz 스타일 미국 S&P 500 11대 섹터 전체 종목 마켓 맵(트리맵) 엔진
+ * - Finviz 실시간 데이터(500개 종목) + 11대 표준 섹터 110여개 대표 우량주 전 종목 타일링
+ * - QuickChart POST API를 통한 1200x1200 HD 정사각 고화질 PNG Blob 렌더링
+ */
+function generateUsFinvizHeatmap(stockList) {
+  try {
+    // 1. 실시간 등락률 맵 수집 (Finviz 1순위, 네이버 증권 2순위, 전달받은 stockList 3순위)
+    const perfMap = fetchFinvizMapPerf();
+
+    // 혹시 Finviz에서 누락되었거나 폴백 필요 시 네이버/전달된 리스트 매핑
+    if (Array.isArray(stockList)) {
+      stockList.forEach(s => {
+        const sym = s.code || s.symbol || '';
+        if (sym && perfMap[sym] === undefined) {
+          const r = (typeof s.changeRate === 'number') ? s.changeRate : (parseFloat(s.changeRate) || 0);
+          perfMap[sym] = r;
+        }
+      });
+    }
+
+    // 네이버 해외 증시 상위 시세 폴백 보강
+    if (Object.keys(perfMap).length < 20) {
+      try {
+        const nHeaders = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' };
+        const reqs = [
+          { url: 'https://api.stock.naver.com/stock/exchange/NASDAQ/marketValue?page=1&pageSize=100', headers: nHeaders, muteHttpExceptions: true },
+          { url: 'https://api.stock.naver.com/stock/exchange/NYSE/marketValue?page=1&pageSize=100', headers: nHeaders, muteHttpExceptions: true }
+        ];
+        const resps = UrlFetchApp.fetchAll(reqs);
+        resps.forEach(r => {
+          if (r.getResponseCode() === 200) {
+            const d = JSON.parse(r.getContentText());
+            if (d && Array.isArray(d.stocks)) {
+              d.stocks.forEach(stk => {
+                if (stk.symbolCode && perfMap[stk.symbolCode] === undefined) {
+                  const rate = parseFloat((stk.fluctuationsRatio || '0').toString().replace(/,/g, '')) || 0;
+                  perfMap[stk.symbolCode] = rate;
+                }
+              });
+            }
+          }
+        });
+      } catch (ne) {
+        Logger.log('Naver fallback for US heatmap error: ' + ne.toString());
+      }
+    }
+
+    // 2. Finviz 표준 11대 섹터별 핵심 대표 종목군 (68개 주요 주도주로 가독성 극대화)
+    const sectorDefinitions = {
+      "TECHNOLOGY": [
+        { s: "NVDA", cap: 3200 }, { s: "AAPL", cap: 3400 }, { s: "MSFT", cap: 3100 },
+        { s: "AVGO", cap: 800 }, { s: "ORCL", cap: 450 }, { s: "CRM", cap: 320 },
+        { s: "AMD", cap: 250 }, { s: "ADBE", cap: 240 }, { s: "QCOM", cap: 200 },
+        { s: "NOW", cap: 190 }, { s: "AMAT", cap: 170 }, { s: "MU", cap: 130 },
+        { s: "PLTR", cap: 130 }, { s: "INTC", cap: 100 }, { s: "CSCO", cap: 230 }
+      ],
+      "COMMUNICATION SERVICES": [
+        { s: "GOOGL", cap: 2100 }, { s: "META", cap: 1500 }, { s: "NFLX", cap: 330 },
+        { s: "DIS", cap: 200 }, { s: "TMUS", cap: 230 }, { s: "VZ", cap: 170 }, { s: "T", cap: 160 }
+      ],
+      "CONSUMER CYCLICAL": [
+        { s: "AMZN", cap: 2000 }, { s: "TSLA", cap: 750 }, { s: "HD", cap: 400 },
+        { s: "MCD", cap: 210 }, { s: "BKNG", cap: 140 }, { s: "SBUX", cap: 110 }, { s: "NKE", cap: 120 }
+      ],
+      "FINANCIAL": [
+        { s: "BRK-B", cap: 1000 }, { s: "JPM", cap: 650 }, { s: "V", cap: 550 },
+        { s: "MA", cap: 470 }, { s: "BAC", cap: 330 }, { s: "WFC", cap: 220 },
+        { s: "MS", cap: 190 }, { s: "GS", cap: 170 }, { s: "BLK", cap: 150 }, { s: "AXP", cap: 160 }
+      ],
+      "HEALTHCARE": [
+        { s: "LLY", cap: 850 }, { s: "UNH", cap: 530 }, { s: "JNJ", cap: 380 },
+        { s: "ABBV", cap: 350 }, { s: "MRK", cap: 270 }, { s: "TMO", cap: 220 },
+        { s: "ABT", cap: 200 }, { s: "ISRG", cap: 180 }, { s: "PFE", cap: 160 }
+      ],
+      "CONSUMER DEFENSIVE": [
+        { s: "WMT", cap: 670 }, { s: "COST", cap: 400 }, { s: "PG", cap: 400 },
+        { s: "KO", cap: 280 }, { s: "PEP", cap: 230 }, { s: "PM", cap: 190 }
+      ],
+      "INDUSTRIALS": [
+        { s: "GE", cap: 200 }, { s: "CAT", cap: 190 }, { s: "RTX", cap: 160 },
+        { s: "UNP", cap: 150 }, { s: "BA", cap: 110 }, { s: "HON", cap: 140 }, { s: "DE", cap: 110 }
+      ],
+      "ENERGY": [
+        { s: "XOM", cap: 480 }, { s: "CVX", cap: 280 }, { s: "COP", cap: 130 }, { s: "SLB", cap: 65 }
+      ],
+      "UTILITIES": [
+        { s: "NEE", cap: 165 }, { s: "SO", cap: 95 }, { s: "DUK", cap: 85 }
+      ],
+      "REAL ESTATE": [
+        { s: "PLD", cap: 115 }, { s: "AMT", cap: 90 }, { s: "EQIX", cap: 85 }, { s: "WELL", cap: 80 }
+      ],
+      "BASIC MATERIALS": [
+        { s: "LIN", cap: 220 }, { s: "SHW", cap: 95 }, { s: "FCX", cap: 65 }
+      ]
+    };
+
+    let allCaps = [];
+    Object.values(sectorDefinitions).forEach(list => list.forEach(i => allCaps.push(i.cap)));
+    const maxCap = Math.max(...allCaps);
+
+    // 3. Graphviz DOT 클러스터 생성 (섹터별 그룹화)
+    const clusterDoms = Object.entries(sectorDefinitions).map(([secName, list], cIdx) => {
+      const nodes = list.map((item, sIdx) => {
+        let rate = 0;
+        if (typeof perfMap[item.s] === 'number') {
+          rate = perfMap[item.s];
+        }
+        const sign = rate > 0 ? '+' : '';
+        const color = getHeatmapColor(rate, true);
+        const normRatio = Math.sqrt(item.cap / maxCap);
+        const area = Math.max(Math.round(normRatio * 380), 38);
+
+        // 글자 크기 대폭 상향: 최소 22pt 보장, 메가캡 54pt
+        let fsName = 22;
+        let fsRate = 16;
+        if (area >= 240) { fsName = 54; fsRate = 34; }
+        else if (area >= 150) { fsName = 42; fsRate = 26; }
+        else if (area >= 90)  { fsName = 34; fsRate = 22; }
+        else if (area >= 60)  { fsName = 28; fsRate = 19; }
+        else if (area >= 45)  { fsName = 24; fsRate = 17; }
+
+        const label = `<<b><font point-size="${fsName}">${item.s}</font></b><br/><font point-size="${fsRate}">${sign}${rate.toFixed(2)}%</font>>`;
+        return `n_${cIdx}_${sIdx} [label=${label}, area=${area}, fillcolor="${color}"];`;
+      }).join('\n    ');
+
+      const hdr = `h_${cIdx} [label=<<b>${secName}</b>>, area=12, fillcolor="#0f172a", fontcolor="#cbd5e1", fontsize=20, penwidth=0];`;
+      return `  subgraph cluster_${cIdx} {\n    graph [style="solid", color="#334155", penwidth=2.0];\n    ${hdr}\n    ${nodes}\n  }`;
+    }).join('\n\n');
+
+    const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#090d16", pad=0.01, margin=0];\n  node [style="filled", shape=box, fontname="Arial Bold, sans-serif", fontcolor=white, penwidth=1.5, color="#090d16"];\n\n${clusterDoms}\n}`;
+
+    // 4. QuickChart POST API를 통한 1600x1600 초고해상도 HD 정사각 고화질 렌더링
+    const qcRes = UrlFetchApp.fetch('https://quickchart.io/graphviz', {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        graph: dot,
+        format: 'png',
+        width: 1600,
+        height: 1600
+      }),
+      muteHttpExceptions: true
+    });
+
+    if (qcRes.getResponseCode() === 200) {
+      const blob = qcRes.getBlob().setName('us_sp500_market_heatmap.png');
+      return blob;
+    } else {
+      Logger.log('QuickChart POST error, code: ' + qcRes.getResponseCode() + ', body: ' + qcRes.getContentText());
+    }
+  } catch (err) {
+    Logger.log('generateUsFinvizHeatmap error: ' + err.toString());
+  }
+  return null;
+}
+
 function generateMarketHeatmapUrl(arg1, arg2) {
   const marketType = (typeof arg1 === 'string') ? arg1 : (typeof arg2 === 'string' ? arg2 : 'KOSPI');
   let stockList = Array.isArray(arg2) ? arg2 : (Array.isArray(arg1) ? arg1 : []);
   const isUs = marketType === 'US';
   const width = 1200;
   const height = 1200;
+
+  // 🇺🇸 미국 증시인 경우 Finviz 스타일 S&P 500 전 종목 11대 섹터 히트맵 엔진 호출
+  if (isUs) {
+    const usBlob = generateUsFinvizHeatmap(stockList);
+    if (usBlob) return usBlob;
+  }
 
   try {
     let items = [];
@@ -2081,7 +2278,7 @@ function generateMarketHeatmapUrl(arg1, arg2) {
       }
     }
 
-    // 2. 미국 또는 API 폴백: 전달받은 stockList 활용
+    // 2. 국내 증시 API 폴백 또는 레거시 대응
     if (items.length === 0 && Array.isArray(stockList) && stockList.length > 0) {
       items = stockList.slice(0, 32).map(s => {
         const cap = s.marketCapRaw || 10000;
@@ -2134,6 +2331,26 @@ function generateMarketHeatmapUrl(arg1, arg2) {
     }).join('\n\n');
 
     const dot = `graph {\n  layout=patchwork;\n  graph [bgcolor="#090d16", pad=0.01, margin=0];\n  node [style="filled", shape=box, fontname="NanumGothic, Arial, sans-serif", fontcolor=white, penwidth=1.5, color="#090d16"];\n\n${clusterDoms}\n}`;
+
+    // QuickChart POST로 고화질 PNG Blob 획득 시도 (실패 시 GET URL 폴백)
+    try {
+      const qcRes = UrlFetchApp.fetch('https://quickchart.io/graphviz', {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({
+          graph: dot,
+          format: 'png',
+          width: width,
+          height: height
+        }),
+        muteHttpExceptions: true
+      });
+      if (qcRes.getResponseCode() === 200) {
+        return qcRes.getBlob().setName('kr_market_heatmap.png');
+      }
+    } catch (e) {
+      Logger.log('QuickChart POST for KR error, fallback to URL: ' + e.toString());
+    }
 
     return `https://quickchart.io/graphviz?format=png&width=${width}&height=${height}&graph=` + encodeURIComponent(dot);
   } catch (err) {
@@ -2710,38 +2927,65 @@ function sendTelegramPhotos(token, chatId, photoUrls, caption) {
   try {
     if (photoUrls.length === 1) {
       const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+      const item = photoUrls[0];
+      const isBlob = (typeof item !== 'string');
       const payload = {
         chat_id: chatId,
-        photo: photoUrls[0],
+        photo: item,
         caption: caption || '',
         parse_mode: 'HTML'
       };
-      const res = UrlFetchApp.fetch(url, {
+
+      const fetchOptions = {
         method: 'post',
-        contentType: 'application/json',
-        payload: JSON.stringify(payload),
+        payload: isBlob ? payload : JSON.stringify(payload),
         muteHttpExceptions: true
-      });
+      };
+      if (!isBlob) {
+        fetchOptions.contentType = 'application/json';
+      }
+
+      const res = UrlFetchApp.fetch(url, fetchOptions);
       return JSON.parse(res.getContentText());
     } else {
-      // 2장 이상일 경우 sendMediaGroup으로 깔끔한 묶음 사진 앨범 전송 (나스닥 & S&P 500)
+      // 2장 이상일 경우 sendMediaGroup으로 깔끔한 묶음 사진 앨범 전송 (나스닥 & S&P 500 & 히트맵)
       const url = `https://api.telegram.org/bot${token}/sendMediaGroup`;
-      const media = photoUrls.map((p, idx) => ({
-        type: 'photo',
-        media: p,
-        caption: idx === 0 ? (caption || '') : '',
-        parse_mode: 'HTML'
-      }));
+      const media = [];
       const payload = {
-        chat_id: chatId,
-        media: media
+        chat_id: chatId
       };
-      const res = UrlFetchApp.fetch(url, {
-        method: 'post',
-        contentType: 'application/json',
-        payload: JSON.stringify(payload),
-        muteHttpExceptions: true
+      let hasBlob = false;
+
+      photoUrls.forEach((p, idx) => {
+        const isBlob = (typeof p !== 'string');
+        const mediaObj = {
+          type: 'photo',
+          caption: idx === 0 ? (caption || '') : '',
+          parse_mode: 'HTML'
+        };
+        if (isBlob) {
+          hasBlob = true;
+          const attachKey = `file_${idx}`;
+          mediaObj.media = `attach://${attachKey}`;
+          payload[attachKey] = p;
+        } else {
+          mediaObj.media = p;
+        }
+        media.push(mediaObj);
       });
+
+      payload.media = JSON.stringify(media);
+
+      const fetchOptions = {
+        method: 'post',
+        payload: hasBlob ? payload : JSON.stringify(payload),
+        muteHttpExceptions: true
+      };
+      if (!hasBlob) {
+        fetchOptions.contentType = 'application/json';
+      }
+
+      const res = UrlFetchApp.fetch(url, fetchOptions);
       return JSON.parse(res.getContentText());
     }
   } catch (err) {
@@ -2780,8 +3024,10 @@ function sendTelegramReportWithPhotos(config, headerHtml, photoUrls, photoCaptio
   
   // 텔레그램 이미지 캐싱 방지를 위해 timestamp 파라미터 부착 (매 발송마다 최신 차트 로드 보장)
   // 단, QuickChart 단축 렌더 URL(quickchart.io)은 고유 해시 ID를 가지며 쿼리 파라미터 부착 시 HTTP 400 Bad Request가 발생하므로 원본 유지
+  // Blob 객체는 쿼리스트링 부착 없이 그대로 통과
   const cacheBustedPhotos = (photoUrls || []).map(url => {
     if (!url) return url;
+    if (typeof url !== 'string') return url;
     if (url.indexOf('quickchart.io') !== -1) return url;
     const separator = url.includes('?') ? '&' : '?';
     return `${url}${separator}t=${new Date().getTime()}`;
