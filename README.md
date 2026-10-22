@@ -2,7 +2,7 @@
 
 > **Google Apps Script(GAS)**와 **Modern TailwindCSS Web UI** 기반으로 개발된 한국 증시(NXT 프리마켓 / KRX·NXT 정규장 / 통합 애프터마켓) 및 미국 증시(US 본장) 시가총액 변동 자동 분석 및 텔레그램 리포팅 시스템입니다.
 
-[![Version](https://img.shields.io/badge/version-v3.4.1-blue.svg)](https://github.com/moozuknet/StockRankInfo)
+[![Version](https://img.shields.io/badge/version-v3.4.2-blue.svg)](https://github.com/moozuknet/StockRankInfo)
 [![Platform](https://img.shields.io/badge/platform-Google%20Apps%20Script-green.svg)](https://developers.google.com/apps-script)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 
@@ -179,6 +179,7 @@ flowchart TD
 
 | 버전 | 출시 일자 | 주요 기능 및 변경사항 |
 | :---: | :---: | :--- |
+| **v3.4.2** | 2026-10-22 | • **국내 증시 히트맵 특수문자 XML 이스케이프 (`escapeGraphvizHtml`)**: 코스피 상위 종목 `KT&G` 등 앰퍼샌드(`&`) 포함 종목의 Graphviz 파싱 오류 및 HTTP 400 Bad Request 해결<br>• **텔레그램 미디어 그룹 폴백 방어 로직 추가**: 묶음 사진(`sendMediaGroup`) 전송 실패 시 정상 이미지(지수 수급 종합차트)가 동반 누락되지 않도록 단건(`sendPhoto`) 개별 전송 자동 폴백 구현<br>• **코스피 히트맵 호출 인자 표준화**: `generateMarketHeatmapUrl('KOSPI', processedKospi)` 일관성 확보 |
 | **v3.4.1** | 2026-10-16 | • **미국 시장 맵 가독성 극대화**: 11대 섹터 68개 핵심 주도주 정예화 및 폰트 크기 대폭 상향(최소 22pt BOLD 보장, 메가캡 54pt)<br>• **초고해상도 1600x1600 Ultra HD 렌더링**: 모바일 텔레그램 화면 확대 시에도 칼같은 선명도 유지<br>• **clasp 배포 단일화**: 배포 시 이전 배포 자동 정리 및 최종 1개 버전만 유지 |
 | **v3.4.0** | 2026-10-16 | • **핀비즈(Finviz) 스타일 미국 S&P 500 전 종목 마켓 맵 전면 개편**: 상위 몇 개 종목만 나오던 한계를 해결하고 11대 섹터 전체 종목 체계 구축<br>• **Finviz 500개 종목 실시간 등락률 파이프라인 연동**: `initialPerf.nodes` 실시간 파싱 및 네이버 시세 2중 폴백<br>• **텔레그램 무손실 Multipart 파일 전송 (`attach://`)**: Graphviz POST API 연동 및 URL 길이 제한 없는 고화질 Blob 전송 |
 | **v3.3.2** | 2026-10-13 | • **투자자 수급 4선 차트 텔레그램 전송 안정화**: QuickChart CDN 단축 URL 파라미터 충돌(HTTP 400 Bad Request) 방지를 위한 스마트 캐시버스팅 예외 처리 적용<br>• **장중 수급 데이터 전 구간(09:00~15:30) 동기화**: `startIdx 0~3`(총 200개 아이템) 시계열 수집 정상화로 영웅문 [0251] HTS와 100% 동일 곡선 일치 |

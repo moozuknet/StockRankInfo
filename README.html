@@ -23,7 +23,7 @@
 <body>
   <h1>📊 README - 증시 시가총액 변동 분석 &amp; 텔레그램 자동 발송 웹 UI</h1>
   <div>
-    <span class="badge badge-blue">v3.3.2 Release</span>
+    <span class="badge badge-blue">v3.4.2 Release</span>
     <span class="badge badge-green">Google Apps Script</span>
   </div>
   <p><b>Google Apps Script(GAS)</b>와 <b>Modern TailwindCSS Web UI</b> 기반으로 개발된 한국 증시(NXT 프리마켓 / KRX·NXT 정규장 / 통합 애프터마켓) 및 미국 증시(US 본장) 시가총액 변동 자동 분석 및 텔레그램 리포팅 시스템입니다.</p>
@@ -164,6 +164,21 @@
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td><b>v3.4.2</b></td>
+        <td>2026-10-22</td>
+        <td>• <b>국내 증시 히트맵 특수문자 XML 이스케이프 (escapeGraphvizHtml):</b> 코스피 상위 종목 KT&amp;G 등 앰퍼샌드(&amp;) 포함 종목의 Graphviz 파싱 오류 및 HTTP 400 Bad Request 해결<br>• <b>텔레그램 미디어 그룹 폴백 방어 로직 추가:</b> 묶음 사진(sendMediaGroup) 전송 실패 시 정상 이미지(지수 수급 종합차트)가 동반 누락되지 않도록 단건(sendPhoto) 개별 전송 자동 폴백 구현<br>• <b>코스피 히트맵 호출 인자 표준화:</b> generateMarketHeatmapUrl('KOSPI', processedKospi) 일관성 확보</td>
+      </tr>
+      <tr>
+        <td><b>v3.4.1</b></td>
+        <td>2026-10-16</td>
+        <td>• <b>미국 시장 맵 가독성 극대화:</b> 11대 섹터 68개 핵심 주도주 정예화 및 폰트 크기 대폭 상향(최소 22pt BOLD 보장, 메가캡 54pt)<br>• <b>초고해상도 1600x1600 Ultra HD 렌더링:</b> 모바일 텔레그램 화면 확대 시에도 칼같은 선명도 유지<br>• <b>clasp 배포 단일화:</b> 배포 시 이전 배포 자동 정리 및 최종 1개 버전만 유지</td>
+      </tr>
+      <tr>
+        <td><b>v3.4.0</b></td>
+        <td>2026-10-16</td>
+        <td>• <b>핀비즈(Finviz) 스타일 미국 S&amp;P 500 전 종목 마켓 맵 전면 개편:</b> 상위 몇 개 종목만 나오던 한계를 해결하고 11대 섹터 전체 종목 체계 구축<br>• <b>Finviz 500개 종목 실시간 등락률 파이프라인 연동:</b> initialPerf.nodes 실시간 파싱 및 네이버 시세 2중 폴백<br>• <b>텔레그램 무손실 Multipart 파일 전송 (attach://):</b> Graphviz POST API 연동 및 URL 길이 제한 없는 고화질 Blob 전송</td>
+      </tr>
       <tr>
         <td><b>v3.3.2</b></td>
         <td>2026-10-13</td>

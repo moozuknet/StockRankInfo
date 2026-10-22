@@ -1965,6 +1965,16 @@ function fetchMarketIndices(marketType) {
  * - 🇰🇷 국내 증시: 한경 마켓맵 스타일 업종별 클러스터 그룹화 + 상위 32개 대표주 타일링
  * - 7단계 정밀 등락률 컬러 그라데이션 (국내: 상승 빨강, 하락 파랑 / 미국: 상승 녹색, 하락 빨강)
  */
+function escapeGraphvizHtml(str) {
+  if (!str) return '';
+  return str.toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function cleanHeatmapStockName(raw) {
   let name = (raw || '').replace(/["']/g, '').trim();
   if (name === '한화에어로스페이스') return '한화에어로';
@@ -2196,11 +2206,13 @@ function generateUsFinvizHeatmap(stockList) {
         else if (area >= 60)  { fsName = 28; fsRate = 19; }
         else if (area >= 45)  { fsName = 24; fsRate = 17; }
 
-        const label = `<<b><font point-size="${fsName}">${item.s}</font></b><br/><font point-size="${fsRate}">${sign}${rate.toFixed(2)}%</font>>`;
+        const safeSymbol = escapeGraphvizHtml(item.s);
+        const label = `<<b><font point-size="${fsName}">${safeSymbol}</font></b><br/><font point-size="${fsRate}">${sign}${rate.toFixed(2)}%</font>>`;
         return `n_${cIdx}_${sIdx} [label=${label}, area=${area}, fillcolor="${color}"];`;
       }).join('\n    ');
 
-      const hdr = `h_${cIdx} [label=<<b>${secName}</b>>, area=12, fillcolor="#0f172a", fontcolor="#cbd5e1", fontsize=20, penwidth=0];`;
+      const safeSecName = escapeGraphvizHtml(secName);
+      const hdr = `h_${cIdx} [label=<<b>${safeSecName}</b>>, area=12, fillcolor="#0f172a", fontcolor="#cbd5e1", fontsize=20, penwidth=0];`;
       return `  subgraph cluster_${cIdx} {\n    graph [style="solid", color="#334155", penwidth=2.0];\n    ${hdr}\n    ${nodes}\n  }`;
     }).join('\n\n');
 
@@ -2320,12 +2332,14 @@ function generateMarketHeatmapUrl(arg1, arg2) {
         const sign = s.rate > 0 ? '+' : '';
         const color = getHeatmapColor(s.rate, isUs);
         const fs = getHeatmapFontSizes(area);
-        // 종목명을 크고 굵은 폰트(<b>태그 및 point-size 분리)로 강조
-        const label = `<<b><font point-size="${fs.name}">${s.name}</font></b><br/><font point-size="${fs.rate}">${sign}${s.rate.toFixed(2)}%</font>>`;
+        // 종목명을 크고 굵은 폰트(<b>태그 및 point-size 분리)로 강조 (XML 특수문자 이스케이프)
+        const safeName = escapeGraphvizHtml(s.name);
+        const label = `<<b><font point-size="${fs.name}">${safeName}</font></b><br/><font point-size="${fs.rate}">${sign}${s.rate.toFixed(2)}%</font>>`;
         return `n_${cIdx}_${sIdx} [label=${label}, area=${area}, fillcolor="${color}"];`;
       }).join('\n    ');
 
-      const hdr = `h_${cIdx} [label=<<b>■ ${cName}</b>>, area=10, fillcolor="#1e293b", fontcolor="#94a3b8", fontsize=14];`;
+      const safeCName = escapeGraphvizHtml(cName);
+      const hdr = `h_${cIdx} [label=<<b>■ ${safeCName}</b>>, area=10, fillcolor="#1e293b", fontcolor="#94a3b8", fontsize=14];`;
 
       return `  subgraph cluster_${cIdx} {\n    graph [style="invis"];\n    ${hdr}\n    ${nodes}\n  }`;
     }).join('\n\n');
@@ -2986,7 +3000,24 @@ function sendTelegramPhotos(token, chatId, photoUrls, caption) {
       }
 
       const res = UrlFetchApp.fetch(url, fetchOptions);
-      return JSON.parse(res.getContentText());
+      const resJson = JSON.parse(res.getContentText());
+      if (resJson && resJson.ok) {
+        return resJson;
+      }
+
+      // 만약 묶음 앨범(sendMediaGroup)이 특정 이미지 오류 등으로 실패할 경우,
+      // 정상 이미지들마저 전송되지 않는 문제를 방지하기 위해 단건(sendPhoto)으로 개별 재전송 폴백
+      Logger.log(`sendMediaGroup failed: ${res.getContentText()}. Retrying with individual sendPhoto calls...`);
+      let lastOkResult = resJson;
+      photoUrls.forEach((p, idx) => {
+        try {
+          const singleRes = sendTelegramPhotos(token, chatId, [p], idx === 0 ? (caption || '') : '');
+          if (singleRes && singleRes.ok) lastOkResult = singleRes;
+        } catch (singleErr) {
+          Logger.log(`Individual sendPhoto fallback error for index ${idx}: ${singleErr.toString()}`);
+        }
+      });
+      return lastOkResult;
     }
   } catch (err) {
     Logger.log('sendTelegramPhotos error: ' + err.toString());
@@ -3179,7 +3210,7 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
       photosKospi.push(indicesKospi.kospi.chartUrl);
     }
     if (config.enableHeatmap !== false) {
-      const heatmapKospi = generateMarketHeatmapUrl(processedKospi, 'KOSPI');
+      const heatmapKospi = generateMarketHeatmapUrl('KOSPI', processedKospi);
       if (heatmapKospi) photosKospi.push(heatmapKospi);
     }
     const captionKospi = isHol 
