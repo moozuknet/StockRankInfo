@@ -92,7 +92,7 @@
         <div>
           <h1 class="text-base sm:text-lg font-bold font-display tracking-tight text-white flex items-center gap-2">
             증시 시가총액 변동 분석
-            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-sans font-medium">v3.4.2</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-sans font-medium">v3.5.0</span>
           </h1>
           <p class="text-xs text-slate-400 hidden sm:block">KRX 정규장 · NXT 야간거래소 · 미국 증시 마감 다중 텔레그램 자동 브리핑</p>
         </div>
@@ -354,9 +354,9 @@
         <!-- Period Compare Checkboxes -->
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-2">
-            비교 대상 과거 기간 선택 (복수 선택 가능)
+            비교 대상 과거 기간 선택 (복수 선택 가능 · 기간별 수급 분석 및 차트 기준 연동)
           </label>
-          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="compare1d" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
               <span class="text-xs font-semibold text-slate-200">1일 전 (전일)</span>
@@ -374,8 +374,12 @@
               <span class="text-xs font-semibold text-slate-200">3개월 전</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
-              <input type="checkbox" id="compare1y" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
-              <span class="text-xs font-semibold text-slate-200">1년 전</span>
+              <input type="checkbox" id="compare6m" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
+              <span class="text-xs font-semibold text-slate-200">6개월 전 (반기)</span>
+            </label>
+            <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
+              <input type="checkbox" id="compare1y" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
+              <span class="text-xs font-semibold text-slate-200">1년 전 (연초~)</span>
             </label>
           </div>
         </div>
@@ -393,6 +397,10 @@
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="showHighDiff" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
               <span class="text-xs font-semibold text-amber-400">🏔️ 최고점 대비 등락률 (고점 대비 +,-%) 표기</span>
+            </label>
+            <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
+              <input type="checkbox" id="showPeriodSupply" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0" checked>
+              <span class="text-xs font-semibold text-cyan-400">📊 설정 기간별 코스피·코스닥 수급 분석 (누적·월별 차트 &amp; 요약) 표기</span>
             </label>
             <label class="flex items-center gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 cursor-pointer transition select-none">
               <input type="checkbox" id="showPastCap" class="w-4 h-4 rounded text-blue-600 bg-slate-800 border-slate-700 focus:ring-0">
@@ -606,8 +614,10 @@
                 compare5d: true,
                 compare1m: false,
                 compare3m: false,
-                compare1y: false,
+                compare6m: false,
+                compare1y: true,
                 showPastCap: false,
+                showPeriodSupply: true,
                 showChangePercent: true,
                 showIcons: true,
                 showLinks: true,
@@ -1007,10 +1017,12 @@
       document.getElementById('compare5d').checked = !!config.compare5d;
       document.getElementById('compare1m').checked = !!config.compare1m;
       document.getElementById('compare3m').checked = !!config.compare3m;
+      document.getElementById('compare6m').checked = !!config.compare6m;
       document.getElementById('compare1y').checked = !!config.compare1y;
       
       document.getElementById('showPastCap').checked = !!config.showPastCap;
       document.getElementById('showHighDiff').checked = (config.showHighDiff !== false);
+      document.getElementById('showPeriodSupply').checked = (config.showPeriodSupply !== false);
       document.getElementById('showChangePercent').checked = !!config.showChangePercent;
       document.getElementById('showIcons').checked = !!config.showIcons;
       document.getElementById('showLinks').checked = !!config.showLinks;
@@ -1035,6 +1047,7 @@
         enableHeatmap: document.getElementById('enableHeatmap').checked,
         showSector: document.getElementById('showSector').checked,
         showHighDiff: document.getElementById('showHighDiff').checked,
+        showPeriodSupply: document.getElementById('showPeriodSupply').checked,
         krxPre: document.getElementById('krxPre').checked,
         krxMain: document.getElementById('krxMain').checked,
         krxAfter: isAfterChecked,
@@ -1046,6 +1059,7 @@
         compare5d: document.getElementById('compare5d').checked,
         compare1m: document.getElementById('compare1m').checked,
         compare3m: document.getElementById('compare3m').checked,
+        compare6m: document.getElementById('compare6m').checked,
         compare1y: document.getElementById('compare1y').checked,
         showPastCap: document.getElementById('showPastCap').checked,
         showChangePercent: document.getElementById('showChangePercent').checked,
@@ -1136,7 +1150,30 @@
       document.getElementById('modalSubtitle').innerText = '상위 ' + res.stockCount + '개 종목 실시간 수집 결과';
       document.getElementById('modalCharBadge').innerText = res.charCount.toLocaleString() + '자';
       
-      document.getElementById('previewRenderView').innerHTML = res.htmlMessage;
+      const formatHtmlBlock = (str) => (str || '').replace(/\n/g, '<br>');
+      let chartGalleryHtml = '';
+      if (Array.isArray(res.chartUrls) && res.chartUrls.length > 0) {
+        const imgs = res.chartUrls.map((u, idx) =>
+          '<div class="rounded-xl overflow-hidden border border-slate-800 bg-slate-900/90 p-2">' +
+            '<div class="text-[11px] font-semibold text-sky-400 mb-1.5 flex items-center gap-1.5">' +
+              '<i class="fa-solid fa-chart-area"></i>' +
+              '<span>첨부 차트 이미지 #' + (idx + 1) + ' (텔레그램 앨범 전송)</span>' +
+            '</div>' +
+            '<img src="' + u + '" alt="Chart Preview ' + (idx + 1) + '" class="w-full h-auto rounded-lg bg-white" loading="lazy">' +
+          '</div>'
+        ).join('');
+        chartGalleryHtml = '<div class="my-4 space-y-3">' + imgs + '</div>';
+      }
+
+      if (res.headerHtml && res.bodyHtml) {
+        document.getElementById('previewRenderView').innerHTML =
+          '<div>' + formatHtmlBlock(res.headerHtml) + '</div>' +
+          chartGalleryHtml +
+          '<div>' + formatHtmlBlock(res.bodyHtml) + '</div>';
+      } else {
+        document.getElementById('previewRenderView').innerHTML =
+          chartGalleryHtml + '<div>' + formatHtmlBlock(res.htmlMessage) + '</div>';
+      }
       document.getElementById('previewRawView').value = res.htmlMessage;
       
       const switcherEl = document.getElementById('modalSubMarketSwitcher');
@@ -1201,8 +1238,8 @@
       } else {
         rawBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-600 text-white cursor-pointer';
         renderBtn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer';
-        renderView.classList.remove('hidden');
-        rawView.classList.add('hidden');
+        renderView.classList.add('hidden');
+        rawView.classList.remove('hidden');
       }
     }
 

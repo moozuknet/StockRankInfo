@@ -272,7 +272,23 @@ flowchart TD
   - 대형주 최대 38pt BOLD, 중형주 24~30pt BOLD, 일반 종목 최소 16pt 이상 BOLD.
   - 1200x1200 HD 정사각 뷰 제공.
 
-### 5) 3단계 스마트 순차 전송 파이프라인 (`sendTelegramReportWithPhotos`)
+### 5) 설정 기간별 코스피·코스닥 누적 순매수 선그래프 & 월별 순매수 막대그래프 엔진 (`buildMarketPeriodSupplyAnalysis`, `generatePeriodSupplyChartUrl`)
+- **도입 배경 (v3.5.0)**:
+  - 당일 장중 수급뿐만 아니라 사용자가 선택한 과거 비교 기간(`1y (연초 이후)`, `6m (6개월 전)`, `3m (3개월 전)`, `1m (1개월 전)`, `5d (5일 전)`, `1d (1일 전)`) 이후의 **코스피(KOSPI) 및 코스닥(KOSDAQ) 외국인·기관·개인 누적 순매수 추이(선그래프)**와 **월별/구간별 순매수 추이(막대그래프)**를 알림 텍스트 요약과 2단 결합 고해상도 차트 이미지로 동시에 제공합니다.
+- **일별 투자자 매매동향 데이터 수집 (`fetchDailyInvestorTrendRows`)**:
+  - 엔드포인트: `https://stock.naver.com/api/domestic/market/trend/daily?tradeType=KRX&marketType={KOSPI|KOSDAQ}&startIdx={0..4}&pageSize=50&segmentType=DATE`
+  - `UrlFetchApp.fetchAll`을 통해 5페이지(최대 250거래일, 약 1년치) 데이터를 일괄 병렬 수집합니다.
+  - 투자자 구분 코드 매핑:
+    - **개인 (`pers`)**: `8000`
+    - **외국인 (`forn`)**: `9000` (외국인) + `9001` (기타외국인)
+    - **기관 (`inst`)**: `1000`(금융투자), `2000`(보험), `3000`(투신), `3100`(사모펀드), `4000`(은행), `5000`(기타금융), `6000`(연기금등), `7000`(기타법인/국가) 합산
+- **Chart.js v3 다중 스택 축 기반 2단(상·하) 결합 차트 렌더링 (`generatePeriodSupplyChartUrl`)**:
+  - QuickChart `version: '3'` + `chartjs-plugin-annotation` + `chartjs-plugin-datalabels`를 사용하여 단일 1000x1080 PNG 캔버스 안에 상단과 하단 2개의 독립 패널을 결합합니다:
+    - **상단 패널 (`yTop`, `stackWeight: 1.25`)**: 일별 누적 순매수 선그래프 (`외국인 #2b72d6`, `기관 #e66c37`, `개인 #20a366`), 우측 끝단 최종 누적 금액 라벨(겹침 방지 오프셋 자동 산출) 및 월 경계 하단 눈금 표기.
+    - **중간 여백 축 (`yGap`, `stackWeight: 0.14`)**: 상·하단 패널 간 시각적 분리 및 하단 패널 타이틀 영역 확보.
+    - **하단 패널 (`yBottom`, `stackWeight: 1.0`)**: 월별(또는 5일/1일 구간별) 3대 주체 순매수 막대그래프 및 외국인 막대 수치 데이터 라벨(`datalabels`) 자동 표기.
+
+### 6) 3단계 스마트 순차 전송 파이프라인 (`sendTelegramReportWithPhotos`)
 - **전송 순서**:
   1. **1단계**: `[헤더 & 최상단 지수 종합 시황]` 텍스트 발송
   2. **2단계**: `[네이버 공식 지수 차트 + 고해상도 시총 히트맵]` 묶음 사진 앨범(`sendMediaGroup`) 발송 (시황 바로 아래 위치)

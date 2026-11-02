@@ -23,14 +23,31 @@
 <body>
   <h1>📊 README - 증시 시가총액 변동 분석 &amp; 텔레그램 자동 발송 웹 UI</h1>
   <div>
-    <span class="badge badge-blue">v3.4.2 Release</span>
+    <span class="badge badge-blue">v3.5.0 Release</span>
     <span class="badge badge-green">Google Apps Script</span>
   </div>
   <p><b>Google Apps Script(GAS)</b>와 <b>Modern TailwindCSS Web UI</b> 기반으로 개발된 한국 증시(NXT 프리마켓 / KRX·NXT 정규장 / 통합 애프터마켓) 및 미국 증시(US 본장) 시가총액 변동 자동 분석 및 텔레그램 리포팅 시스템입니다.</p>
 
   <h2>📸 대시보드 &amp; 시황 멀티 차트 / 히트맵 스크린샷</h2>
 
-  <h3>1) 투자자별 매매동향 종합 멀티라인 차트 (v3.3.2 최신)</h3>
+  <h3>1) 설정 기간별 코스피·코스닥 누적 순매수 선그래프 &amp; 월별 순매수 막대그래프 (v3.5.0 NEW)</h3>
+  <p style="color: #94a3b8; font-size: 13px;">💡 <b>2단 상·하 결합 고해상도 수급 분석 차트 (1000x1080 HD):</b> 상단 패널(누적 순매수 선그래프 + 우측 끝단 최종 누적 금액 라벨)과 하단 패널(월별/구간별 순매수 막대그래프 + 외국인 수치 라벨)을 결합하여 코스피(KOSPI)와 코스닥(KOSDAQ) 각각 제공합니다.</p>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align: center;">코스피(KOSPI) 기간별 누적·월별 수급 차트</th>
+        <th style="text-align: center;">코스닥(KOSDAQ) 기간별 누적·월별 수급 차트</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="text-align: center;"><img src="assets/preview_kospi_period_supply.png" alt="코스피 기간별 수급 차트"></td>
+        <td style="text-align: center;"><img src="assets/preview_kosdaq_period_supply.png" alt="코스닥 기간별 수급 차트"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>2) 당일 투자자별 매매동향 종합 멀티라인 차트 (v3.3.2+)</h3>
   <p style="color: #94a3b8; font-size: 13px;">💡 <b>영웅문 [0251] 스타일 다중축(Dual-Axis) 4선 복합 차트:</b> 좌측축(지수 pt)과 우측축(누적 금액 억 원) 위에 KOSPI/KOSDAQ 지수(파랑), 개인(주황), 외국인(빨강), 기관계(청록) 4개 곡선을 장중 시간대별(09:00~15:30 전 구간 200개 시계열)로 완벽히 재현하여 지수 흐름과 수급 주체의 방향성을 100% 동일하게 한눈에 파악합니다.</p>
   <table>
     <thead>
@@ -164,6 +181,11 @@
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td><b>v3.5.0</b></td>
+        <td>2026-11-02</td>
+        <td>• <b>설정 기간별 코스피(KOSPI)·코스닥(KOSDAQ) 수급 분석 엔진 및 2단 결합 차트 신설 (showPeriodSupply):</b> 리포트 상세 서식 옵션에 기간별 수급 분석 표기 토글 추가 및 compare6m(6개월 전 / 반기) 비교 기간 신설<br>• <b>네이버 일별 투자자 매매동향 250거래일 병렬 수집:</b> 외국인·기관·개인 일별 순매수 시계열 기반 설정 기간별 누적 순매수 및 월별 순매수 정밀 집계<br>• <b>누적 순매수 선그래프(상단) + 월별 순매수 막대그래프(하단) 단일 이미지 렌더링:</b> Chart.js v3 다중 스택 축(yTop, yGap, yBottom) + annotation + datalabels 조합으로 우측 끝단 누적 라벨 및 월별 외국인 수치 라벨 자동 표기</td>
+      </tr>
       <tr>
         <td><b>v3.4.2</b></td>
         <td>2026-10-22</td>

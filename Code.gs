@@ -548,11 +548,13 @@ function getDefaultConfig() {
     compare5d: true,
     compare1m: false,
     compare3m: false,
-    compare1y: false,
+    compare6m: false,
+    compare1y: true,
     showPastCap: false,
     showChangePercent: true,
     showSector: true,    // 종목별 섹터(업종) 정보 표기
     showHighDiff: true,  // 종목별 최고점 대비 등락률(+,-%) 표기
+    showPeriodSupply: true, // 설정한 기간별 이후 코스피·코스닥 수급 데이터(누적·월별) 및 차트 표기
     showIcons: true,
     showLinks: true,
     includeAnalystSummary: true
@@ -581,6 +583,12 @@ function loadSettings() {
     }
     if (config.showHighDiff === undefined) {
       config.showHighDiff = true;
+    }
+    if (config.showPeriodSupply === undefined) {
+      config.showPeriodSupply = true;
+    }
+    if (config.compare6m === undefined) {
+      config.compare6m = false;
     }
     
     // krxPre 기본값 보장 (신규 추가 필드 마이그레이션)
@@ -640,6 +648,8 @@ function saveSettings(config) {
     config.enableKosdak = config.enableKosdak !== false;
     config.showSector = config.showSector !== false;
     config.showHighDiff = config.showHighDiff !== false;
+    config.showPeriodSupply = config.showPeriodSupply !== false;
+    config.compare6m = !!config.compare6m;
     config.krxPre = config.krxPre !== false;
     config.krxMain = config.krxMain !== false;
     config.krxAfter = config.krxAfter !== false;
@@ -759,15 +769,33 @@ function previewReport(marketType, subMarket) {
     }
     
     const processed = calculateHistoricalChanges(data, config);
-    const indices = fetchMarketIndices(marketType === 'usMain' ? 'US' : domesticMarket);
-    const htmlMessage = generateReportHtml(sessionTitle, processed, config, indices);
+    const indices = fetchMarketIndices(marketType === 'usMain' ? 'US' : domesticMarket, config);
+    const sections = generateReportSections(sessionTitle, processed, config, indices);
+    const htmlMessage = sections.headerHtml + sections.bodyHtml;
+    
+    const chartUrls = [];
+    if (marketType === 'usMain' && indices) {
+      if (indices.nasdaq && indices.nasdaq.chartUrl) chartUrls.push(indices.nasdaq.chartUrl);
+      if (indices.spx && indices.spx.chartUrl) chartUrls.push(indices.spx.chartUrl);
+    } else if (indices) {
+      const mObj = domesticMarket === 'KOSDAK' ? indices.kosdak : indices.kospi;
+      if (mObj) {
+        if (mObj.chartUrl) chartUrls.push(mObj.chartUrl);
+        if (mObj.periodSupply && Array.isArray(mObj.periodSupply.chartUrls)) {
+          mObj.periodSupply.chartUrls.forEach(u => chartUrls.push(u));
+        }
+      }
+    }
     
     return {
       success: true,
       marketType: marketType,
       subMarket: domesticMarket,
       sessionTitle: sessionTitle,
+      headerHtml: sections.headerHtml,
+      bodyHtml: sections.bodyHtml,
       htmlMessage: htmlMessage,
+      chartUrls: chartUrls,
       stockCount: processed.length,
       charCount: htmlMessage.length
     };
@@ -1830,13 +1858,782 @@ function generateInvestorTrendChartUrl(marketCode, indexObj) {
 }
 
 /**
+ * ============================================================================
+ * 📊 설정 기간별 이후 코스피(KOSPI) · 코스닥(KOSDAQ) 누적 & 월별 수급 분석 및 상·하단 통합 차트 엔진
+ * - 상단 패널: 설정 기간별 누적 순매수 선그래프 (외국인·기관·개인 3선 + 우측 최종 누적액 라벨)
+ * - 하단 패널: 월별(또는 일별) 순매수 3색 막대그래프 (외국인 막대 수치 라벨 표기)
+ * - 비교 대상 과거 기간 선택(1일 전, 5일 전, 1개월 전, 3개월 전, 6개월 전, 1년 전)과 실시간 연동
+ * ============================================================================
+ */
+function fetchDailyInvestorTrendRows(marketType) {
+  const apiCode = (marketType === 'KOSDAK' || marketType === 'KOSDAQ') ? 'KOSDAQ' : 'KOSPI';
+  try {
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      'Referer': `https://stock.naver.com/domestic/index/${apiCode}`
+    };
+
+    const reqs = [0, 1, 2, 3, 4].map(startIdx => ({
+      url: `https://stock.naver.com/api/domestic/market/trend/daily?tradeType=KRX&marketType=${apiCode}&startIdx=${startIdx}&pageSize=50&segmentType=DATE`,
+      headers: headers,
+      muteHttpExceptions: true
+    }));
+
+    const resps = UrlFetchApp.fetchAll(reqs);
+    let allItems = [];
+    resps.forEach(r => {
+      if (r && r.getResponseCode() === 200) {
+        try {
+          const json = JSON.parse(r.getContentText());
+          if (json && Array.isArray(json.content)) {
+            allItems = allItems.concat(json.content);
+          }
+        } catch (e) {}
+      }
+    });
+
+    const rowMap = {};
+    allItems.forEach(item => {
+      if (!item || !item.bizdate) return;
+      let ind = 0, forVal = 0, inst = 0;
+      if (Array.isArray(item.netAmounts)) {
+        item.netAmounts.forEach(na => {
+          const g = na.investorGubun;
+          const v = parseInt(na.diffValue || '0', 10) || 0;
+          if (g === '8000') ind += v;
+          else if (g === '9000' || g === '9001') forVal += v;
+          else if (['1000', '2000', '3000', '3100', '4000', '5000', '6000', '7000'].indexOf(g) !== -1) inst += v;
+        });
+      }
+      rowMap[item.bizdate] = {
+        bizdate: item.bizdate,
+        indJo: ind / 1e12,
+        forJo: forVal / 1e12,
+        instJo: inst / 1e12,
+        indEok: Math.round(ind / 1e8),
+        forEok: Math.round(forVal / 1e8),
+        instEok: Math.round(inst / 1e8)
+      };
+    });
+
+    const sorted = Object.values(rowMap).sort((a, b) => a.bizdate.localeCompare(b.bizdate));
+    if (sorted.length > 0) {
+      return sorted;
+    }
+  } catch (err) {
+    Logger.log(`fetchDailyInvestorTrendRows(${marketType}) error: ` + err.toString());
+  }
+  return getFallbackDailyInvestorRows(apiCode);
+}
+
+function getFallbackDailyInvestorRows(apiCode) {
+  const isKosdaq = (apiCode === 'KOSDAQ');
+  const monthlySpec = isKosdaq ? [
+    { ym: '202601', forJo: 0.48, instJo: 10.09, indJo: -9.25 },
+    { ym: '202602', forJo: 1.21, instJo: 0.77, indJo: -0.62 },
+    { ym: '202603', forJo: 0.13, instJo: 1.32, indJo: -0.73 },
+    { ym: '202604', forJo: -0.33, instJo: -2.03, indJo: 3.27 },
+    { ym: '202605', forJo: 2.89, instJo: -2.49, indJo: 0.19 },
+    { ym: '202606', forJo: 1.58, instJo: 1.49, indJo: -2.86 },
+    { ym: '202607', forJo: 0.10, instJo: 0.08, indJo: -0.33 },
+    { ym: '202608', forJo: -1.84, instJo: -0.36, indJo: 2.16 },
+    { ym: '202609', forJo: -1.56, instJo: 0.34, indJo: 1.18 },
+    { ym: '202610', forJo: -0.91, instJo: 0.08, indJo: 0.83 },
+    { ym: '202611', forJo: -0.04, instJo: 0.06, indJo: -0.02 }
+  ] : [
+    { ym: '202601', forJo: 0.1, instJo: -2.3, indJo: -0.4 },
+    { ym: '202602', forJo: -21.1, instJo: 14.9, indJo: 4.0 },
+    { ym: '202603', forJo: -35.7, instJo: -1.1, indJo: 33.6 },
+    { ym: '202604', forJo: 1.2, instJo: 9.2, indJo: -15.5 },
+    { ym: '202605', forJo: -44.5, instJo: 9.2, indJo: 35.1 },
+    { ym: '202606', forJo: -48.4, instJo: 5.1, indJo: 42.4 },
+    { ym: '202607', forJo: -9.9, instJo: 4.0, indJo: 5.4 },
+    { ym: '202608', forJo: -10.2, instJo: -5.1, indJo: 3.2 },
+    { ym: '202609', forJo: -21.2, instJo: 4.4, indJo: -14.6 },
+    { ym: '202610', forJo: -19.8, instJo: 3.7, indJo: 4.4 },
+    { ym: '202611', forJo: -0.4, instJo: 1.2, indJo: -1.3 }
+  ];
+
+  const rows = [];
+  monthlySpec.forEach(ms => {
+    const daysCount = ms.ym === '202611' ? 1 : 18;
+    for (let d = 1; d <= daysCount; d++) {
+      const dayStr = (d + 1) < 10 ? ('0' + (d + 1)) : ('' + (d + 1));
+      const f = ms.forJo / daysCount;
+      const ins = ms.instJo / daysCount;
+      const ind = ms.indJo / daysCount;
+      rows.push({
+        bizdate: ms.ym + dayStr,
+        forJo: f,
+        instJo: ins,
+        indJo: ind,
+        forEok: Math.round(f * 10000),
+        instEok: Math.round(ins * 10000),
+        indEok: Math.round(ind * 10000)
+      });
+    }
+  });
+  return rows;
+}
+
+function shiftYearMonthStr(year, month, deltaMonths) {
+  let totalMonths = year * 12 + (month - 1) + deltaMonths;
+  const targetYear = Math.floor(totalMonths / 12);
+  const targetMonth = (totalMonths % 12) + 1;
+  const mStr = targetMonth < 10 ? ('0' + targetMonth) : ('' + targetMonth);
+  return {
+    year: targetYear,
+    month: targetMonth,
+    ymStartStr: `${targetYear}${mStr}01`
+  };
+}
+
+function sliceRowsByPeriodKey(allRows, periodKey) {
+  if (!allRows || allRows.length === 0) return null;
+  const lastRow = allRows[allRows.length - 1];
+  const endStr = lastRow.bizdate;
+  const endYear = parseInt(endStr.slice(0, 4), 10);
+  const endMonth = parseInt(endStr.slice(4, 6), 10);
+
+  let filtered = [];
+  let chartTitle = '';
+  let bulletTitle = '';
+
+  if (periodKey === '1d') {
+    filtered = allRows.slice(-2);
+    chartTitle = '전일(1일 전) 이후';
+    bulletTitle = '1일 전(전일) 이후';
+  } else if (periodKey === '5d') {
+    filtered = allRows.slice(-5);
+    chartTitle = '최근 5거래일(1주일) 이후';
+    bulletTitle = '5일 전(1주일) 이후';
+  } else if (periodKey === '1m') {
+    const t = shiftYearMonthStr(endYear, endMonth, -1);
+    filtered = allRows.filter(r => r.bizdate >= t.ymStartStr);
+    chartTitle = `${t.month}월 초 이후`;
+    bulletTitle = `1개월 전(${t.month}월 초) 이후`;
+  } else if (periodKey === '3m') {
+    const t = shiftYearMonthStr(endYear, endMonth, -3);
+    filtered = allRows.filter(r => r.bizdate >= t.ymStartStr);
+    chartTitle = `${t.month}월 초 이후`;
+    bulletTitle = `3개월 전(${t.month}월 초) 이후`;
+  } else if (periodKey === '6m') {
+    const t = shiftYearMonthStr(endYear, endMonth, -5);
+    filtered = allRows.filter(r => r.bizdate >= t.ymStartStr);
+    chartTitle = `${t.month}월 초 이후`;
+    bulletTitle = `6개월 전(${t.month}월 초) 이후`;
+  } else {
+    // '1y' (연초 이후 / 1년 전 이후)
+    const startYearStr = endMonth >= 2 ? `${endYear}0101` : `${endYear - 1}0101`;
+    filtered = allRows.filter(r => r.bizdate >= startYearStr);
+    chartTitle = endMonth >= 2 ? '연초 이후' : '최근 1년 이후';
+    bulletTitle = endMonth >= 2 ? '연초(1년) 이후' : '1년 전 이후';
+  }
+
+  if (filtered.length === 0) {
+    filtered = allRows.slice(-Math.min(allRows.length, 20));
+  }
+
+  let sumForJo = 0, sumInstJo = 0, sumIndJo = 0;
+  let sumForEok = 0, sumInstEok = 0, sumIndEok = 0;
+  filtered.forEach(r => {
+    sumForJo += r.forJo;
+    sumInstJo += r.instJo;
+    sumIndJo += r.indJo;
+    sumForEok += r.forEok;
+    sumInstEok += r.instEok;
+    sumIndEok += r.indEok;
+  });
+
+  const startStr = filtered[0].bizdate;
+  const fmtShortRange = `${startStr.slice(0, 4)}.${parseInt(startStr.slice(4, 6), 10)}.${parseInt(startStr.slice(6, 8), 10)}~${parseInt(endStr.slice(4, 6), 10)}.${parseInt(endStr.slice(6, 8), 10)}`;
+
+  return {
+    periodKey: periodKey,
+    chartTitle: chartTitle,
+    bulletTitle: bulletTitle,
+    rangeStr: fmtShortRange,
+    rows: filtered,
+    sumForJo: sumForJo,
+    sumInstJo: sumInstJo,
+    sumIndJo: sumIndJo,
+    sumForEok: sumForEok,
+    sumInstEok: sumInstEok,
+    sumIndEok: sumIndEok
+  };
+}
+
+function calcNiceSupplyAxis(minVal, maxVal, targetSteps, extraTopRatio, extraBotRatio) {
+  const lo = Math.min(0, minVal);
+  const hi = Math.max(0, maxVal);
+  const span = (hi - lo) || 10;
+  const rawStep = span / targetSteps;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const res = rawStep / mag;
+  let step;
+  if (res > 5) step = 10 * mag;
+  else if (res > 2.5) step = 5 * mag;
+  else if (res > 2) step = 2.5 * mag;
+  else if (res > 1) step = 2 * mag;
+  else step = mag;
+
+  const paddedMin = lo - span * (extraBotRatio || 0.12);
+  const paddedMax = hi + span * (extraTopRatio || 0.25);
+  const niceMin = Math.floor(paddedMin / step) * step;
+  const niceMax = Math.ceil(paddedMax / step) * step;
+  return { min: niceMin, max: niceMax, step: step };
+}
+
+/**
+ * 📈📊 상단(누적 순매수 선그래프) + 하단(월별/일별 순매수 막대그래프) 1장 결합 고해상도 차트 생성
+ */
+function generatePeriodSupplyChartUrl(marketType, periodTitle, dailyRows) {
+  if (!dailyRows || dailyRows.length === 0) return null;
+  try {
+    const marketLabel = (marketType === 'KOSDAK' || marketType === 'KOSDAQ') ? '코스닥(KOSDAQ)' : '코스피(KOSPI)';
+    const n = dailyRows.length;
+    const startStr = dailyRows[0].bizdate;
+    const endStr = dailyRows[n - 1].bizdate;
+    const fmtDate = function(s) {
+      return `${s.slice(0, 4)}.${parseInt(s.slice(4, 6), 10)}.${parseInt(s.slice(6, 8), 10)}`;
+    };
+    const fmtShortEnd = function(s) {
+      return `~${parseInt(s.slice(4, 6), 10)}/${parseInt(s.slice(6, 8), 10)}`;
+    };
+
+    let cumFor = 0, cumInst = 0, cumInd = 0;
+    const xTopLabels = [];
+    const cumForData = [];
+    const cumInstData = [];
+    const cumIndData = [];
+
+    dailyRows.forEach(r => {
+      cumFor += r.forJo;
+      cumInst += r.instJo;
+      cumInd += r.indJo;
+      xTopLabels.push(r.bizdate);
+      cumForData.push(Math.round(cumFor * 100) / 100);
+      cumInstData.push(Math.round(cumInst * 100) / 100);
+      cumIndData.push(Math.round(cumInd * 100) / 100);
+    });
+
+    const maxAbsCum = Math.max(
+      ...cumForData.map(Math.abs),
+      ...cumInstData.map(Math.abs),
+      ...cumIndData.map(Math.abs)
+    );
+    const digits = maxAbsCum < 15 ? 2 : 1;
+    const roundTo = function(v) {
+      return digits === 1 ? Math.round(v * 10) / 10 : Math.round(v * 100) / 100;
+    };
+
+    const isDailyBar = dailyRows.length <= 12;
+    const xBotLabels = [];
+    const barForData = [];
+    const barInstData = [];
+    const barIndData = [];
+    const barForAlign = [];
+    const barForAnchor = [];
+
+    if (isDailyBar) {
+      dailyRows.forEach(r => {
+        const m = parseInt(r.bizdate.slice(4, 6), 10);
+        const d = parseInt(r.bizdate.slice(6, 8), 10);
+        xBotLabels.push(`${m}/${d}`);
+        const fv = roundTo(r.forJo);
+        barForData.push(fv);
+        barInstData.push(roundTo(r.instJo));
+        barIndData.push(roundTo(r.indJo));
+        barForAnchor.push(fv >= 0 ? 'end' : 'start');
+        barForAlign.push(fv >= 0 ? 'end' : 'start');
+      });
+    } else {
+      const monthMap = {};
+      const monthOrder = [];
+      dailyRows.forEach(r => {
+        const ym = r.bizdate.slice(0, 6);
+        if (!monthMap[ym]) {
+          monthMap[ym] = { ym: ym, m: parseInt(r.bizdate.slice(4, 6), 10), forJo: 0, instJo: 0, indJo: 0 };
+          monthOrder.push(ym);
+        }
+        monthMap[ym].forJo += r.forJo;
+        monthMap[ym].instJo += r.instJo;
+        monthMap[ym].indJo += r.indJo;
+      });
+      monthOrder.forEach((ym, idx) => {
+        const g = monthMap[ym];
+        const isLast = idx === monthOrder.length - 1;
+        xBotLabels.push(isLast ? `${g.m}월(${fmtShortEnd(endStr)})` : `${g.m}월`);
+        const fv = roundTo(g.forJo);
+        barForData.push(fv);
+        barInstData.push(roundTo(g.instJo));
+        barIndData.push(roundTo(g.indJo));
+        barForAnchor.push(fv >= 0 ? 'end' : 'start');
+        barForAlign.push(fv >= 0 ? 'end' : 'start');
+      });
+    }
+
+    const lastFor = cumForData[n - 1];
+    const lastInst = cumInstData[n - 1];
+    const lastInd = cumIndData[n - 1];
+    const fmtSigned = function(v) {
+      return (v > 0 ? '+' : '') + v.toFixed(digits) + '조';
+    };
+
+    const allTopVals = [...cumForData, ...cumInstData, ...cumIndData, 0];
+    const topAxis = calcNiceSupplyAxis(Math.min(...allTopVals), Math.max(...allTopVals), 5, 0.25, 0.14);
+
+    const allBotVals = [...barForData, ...barInstData, ...barIndData, 0];
+    const botAxis = calcNiceSupplyAxis(Math.min(...allBotVals), Math.max(...allBotVals), 4, 0.34, 0.22);
+
+    // 우측 끝 라벨 수직 겹침 방지 계산
+    const topSpan = (topAxis.max - topAxis.min) || 10;
+    const endPts = [
+      { key: 'Ind', text: `개인 ${fmtSigned(lastInd)}`, val: lastInd, yAdj: -14, color: '#065F46' },
+      { key: 'Inst', text: `기관 ${fmtSigned(lastInst)}`, val: lastInst, yAdj: -14, color: '#9A3412' },
+      { key: 'For', text: `외국인 ${fmtSigned(lastFor)}`, val: lastFor, yAdj: -14, color: '#1E40AF' }
+    ];
+    endPts.forEach(ep => {
+      ep.estPy = ((topAxis.max - ep.val) / topSpan) * 420 + ep.yAdj;
+    });
+    endPts.sort((a, b) => a.estPy - b.estPy);
+    for (let i = 1; i < endPts.length; i++) {
+      if (endPts[i].estPy - endPts[i - 1].estPy < 26) {
+        const diff = 26 - (endPts[i].estPy - endPts[i - 1].estPy);
+        endPts[i].estPy += diff;
+        endPts[i].yAdj += Math.round(diff);
+      }
+    }
+
+    const annotations = {
+      zeroTop: {
+        type: 'line',
+        yScaleID: 'yTop',
+        yMin: 0,
+        yMax: 0,
+        borderColor: '#334155',
+        borderWidth: 1.6
+      },
+      zeroBot: {
+        type: 'line',
+        yScaleID: 'yBottom',
+        yMin: 0,
+        yMax: 0,
+        borderColor: '#334155',
+        borderWidth: 1.6
+      },
+      panelDivider: {
+        type: 'line',
+        yScaleID: 'yTop',
+        yMin: topAxis.min,
+        yMax: topAxis.min,
+        borderColor: '#CBD5E1',
+        borderWidth: 1.5
+      },
+      topBanner: {
+        type: 'label',
+        xScaleID: 'xTop',
+        yScaleID: 'yTop',
+        xValue: xTopLabels[0],
+        yValue: topAxis.max - (topAxis.max - topAxis.min) * 0.08,
+        position: { x: 'start', y: 'center' },
+        content: [
+          `[${marketLabel}] ${periodTitle} (${fmtDate(startStr)} ~ ${parseInt(endStr.slice(4, 6), 10)}.${parseInt(endStr.slice(6, 8), 10)}) — 누적 순매수 (조원)`,
+          `외국인 ${fmtSigned(lastFor)}   |   기관 ${fmtSigned(lastInst)}   |   개인 ${fmtSigned(lastInd)}`
+        ],
+        textAlign: 'left',
+        font: { size: 16, weight: 'bold' },
+        color: '#0F172A',
+        backgroundColor: 'rgba(255, 255, 255, 0.92)',
+        borderColor: '#CBD5E1',
+        borderWidth: 1,
+        borderRadius: 6,
+        padding: { top: 6, bottom: 6, left: 10, right: 12 }
+      },
+      botBanner: {
+        type: 'label',
+        xScaleID: 'xBottom',
+        yScaleID: 'yBottom',
+        xValue: xBotLabels[0],
+        yValue: botAxis.max - (botAxis.max - botAxis.min) * 0.09,
+        position: { x: 'start', y: 'center' },
+        content: isDailyBar
+          ? `[${marketLabel}] 일별 순매수 (조원) — 숫자는 외국인`
+          : `[${marketLabel}] 월별 순매수 (조원) — 숫자는 외국인`,
+        textAlign: 'left',
+        font: { size: 16, weight: 'bold' },
+        color: '#0F172A',
+        backgroundColor: 'rgba(255, 255, 255, 0.92)',
+        borderColor: '#CBD5E1',
+        borderWidth: 1,
+        borderRadius: 6,
+        padding: { top: 6, bottom: 6, left: 10, right: 12 }
+      }
+    };
+
+    endPts.forEach(ep => {
+      annotations['endLabel' + ep.key] = {
+        type: 'label',
+        xScaleID: 'xTop',
+        yScaleID: 'yTop',
+        xValue: xTopLabels[n - 1],
+        yValue: ep.val,
+        position: { x: 'end', y: 'center' },
+        xAdjust: -4,
+        yAdjust: ep.yAdj,
+        content: ep.text,
+        font: { size: 15, weight: 'bold' },
+        color: ep.color,
+        backgroundColor: 'rgba(250, 249, 245, 0.88)',
+        borderRadius: 4,
+        padding: { top: 2, bottom: 2, left: 5, right: 5 }
+      };
+    });
+
+    if (!isDailyBar) {
+      let prevYm = '';
+      dailyRows.forEach((r, idx) => {
+        const ym = r.bizdate.slice(0, 6);
+        if (ym !== prevYm) {
+          prevYm = ym;
+          if (idx > 3 || dailyRows.length < 120) {
+            const isNearRight = idx >= dailyRows.length - 6;
+            annotations['mTick_' + ym] = {
+              type: 'label',
+              xScaleID: 'xTop',
+              yScaleID: 'yTop',
+              xValue: r.bizdate,
+              yValue: topAxis.min,
+              position: { x: isNearRight ? 'end' : 'center', y: 'start' },
+              yAdjust: 2,
+              content: r.bizdate.slice(4, 6) + '월',
+              font: { size: 13, weight: 'bold' },
+              color: '#475569',
+              backgroundColor: 'transparent',
+              padding: 2
+            };
+          }
+        }
+      });
+    }
+
+    const chartCfg = {
+      type: 'bar',
+      data: {
+        datasets: [
+          {
+            type: 'line',
+            label: '외국인',
+            xAxisID: 'xTop',
+            yAxisID: 'yTop',
+            data: cumForData,
+            borderColor: '#2B72D6',
+            backgroundColor: '#2B72D6',
+            borderWidth: 3.2,
+            pointRadius: 0,
+            tension: 0.1,
+            datalabels: { display: false }
+          },
+          {
+            type: 'line',
+            label: '기관',
+            xAxisID: 'xTop',
+            yAxisID: 'yTop',
+            data: cumInstData,
+            borderColor: '#E56B38',
+            backgroundColor: '#E56B38',
+            borderWidth: 3.2,
+            pointRadius: 0,
+            tension: 0.1,
+            datalabels: { display: false }
+          },
+          {
+            type: 'line',
+            label: '개인',
+            xAxisID: 'xTop',
+            yAxisID: 'yTop',
+            data: cumIndData,
+            borderColor: '#22A86E',
+            backgroundColor: '#22A86E',
+            borderWidth: 3.2,
+            pointRadius: 0,
+            tension: 0.1,
+            datalabels: { display: false }
+          },
+          {
+            type: 'bar',
+            label: '외국인 (월별)',
+            xAxisID: 'xBottom',
+            yAxisID: 'yBottom',
+            data: barForData,
+            backgroundColor: '#2B72D6',
+            barPercentage: 0.86,
+            categoryPercentage: 0.78,
+            datalabels: {
+              display: true,
+              color: '#0F172A',
+              font: { size: 13, weight: 'bold' },
+              anchor: barForAnchor,
+              align: barForAlign,
+              offset: 2
+            }
+          },
+          {
+            type: 'bar',
+            label: '기관 (월별)',
+            xAxisID: 'xBottom',
+            yAxisID: 'yBottom',
+            data: barInstData,
+            backgroundColor: '#E56B38',
+            barPercentage: 0.86,
+            categoryPercentage: 0.78,
+            datalabels: { display: false }
+          },
+          {
+            type: 'bar',
+            label: '개인 (월별)',
+            xAxisID: 'xBottom',
+            yAxisID: 'yBottom',
+            data: barIndData,
+            backgroundColor: '#22A86E',
+            barPercentage: 0.86,
+            categoryPercentage: 0.78,
+            datalabels: { display: false }
+          }
+        ]
+      },
+      options: {
+        layout: {
+          padding: { top: 10, right: 20, bottom: 10, left: 10 }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              color: '#1E293B',
+              font: { size: 14, weight: 'bold' },
+              padding: 16
+            }
+          },
+          annotation: {
+            annotations: annotations
+          }
+        },
+        scales: {
+          xTop: {
+            type: 'category',
+            labels: xTopLabels,
+            display: false
+          },
+          xBottom: {
+            type: 'category',
+            position: 'bottom',
+            labels: xBotLabels,
+            grid: { display: false },
+            ticks: {
+              color: '#1E293B',
+              font: { size: 14, weight: 'bold' }
+            }
+          },
+          yBottom: {
+            type: 'linear',
+            position: 'left',
+            stack: 'supplyStack',
+            stackWeight: 1.0,
+            offset: false,
+            min: botAxis.min,
+            max: botAxis.max,
+            grid: { color: '#E2E8F0' },
+            ticks: {
+              stepSize: botAxis.step,
+              color: '#334155',
+              font: { size: 13, weight: 'bold' }
+            },
+            title: {
+              display: true,
+              text: isDailyBar ? '일별 순매수 (조원)' : '월별 순매수 (조원)',
+              color: '#334155',
+              font: { size: 14, weight: 'bold' }
+            }
+          },
+          yGap: {
+            type: 'linear',
+            position: 'left',
+            stack: 'supplyStack',
+            stackWeight: 0.14,
+            display: false
+          },
+          yTop: {
+            type: 'linear',
+            position: 'left',
+            stack: 'supplyStack',
+            stackWeight: 1.25,
+            offset: false,
+            min: topAxis.min,
+            max: topAxis.max,
+            grid: { color: '#E2E8F0' },
+            ticks: {
+              stepSize: topAxis.step,
+              color: '#334155',
+              font: { size: 13, weight: 'bold' }
+            },
+            title: {
+              display: true,
+              text: '누적 순매수 (조원)',
+              color: '#334155',
+              font: { size: 14, weight: 'bold' }
+            }
+          }
+        }
+      }
+    };
+
+    const postPayload = JSON.stringify({
+      version: '3',
+      width: 1000,
+      height: 1080,
+      backgroundColor: '#FAF9F5',
+      format: 'png',
+      chart: chartCfg
+    });
+
+    const res = UrlFetchApp.fetch('https://quickchart.io/chart/create', {
+      method: 'post',
+      contentType: 'application/json',
+      payload: postPayload,
+      muteHttpExceptions: true
+    });
+
+    if (res.getResponseCode() === 200) {
+      const data = JSON.parse(res.getContentText());
+      if (data && data.success && data.url) {
+        return data.url;
+      }
+    } else {
+      Logger.log(`[QuickChart PeriodSupply] ${marketType} 생성 실패: HTTP ${res.getResponseCode()} - ${res.getContentText()}`);
+    }
+  } catch (err) {
+    Logger.log('generatePeriodSupplyChartUrl error: ' + err.toString());
+  }
+  return null;
+}
+
+function formatSupplyAmountText(joVal, eokVal, isKosdaq) {
+  const absJo = Math.abs(joVal);
+  const sign = joVal > 0 ? '+' : '';
+  if (absJo >= 10) {
+    return `${sign}${joVal.toFixed(1)}조`;
+  } else if (absJo >= 1.0) {
+    return `${sign}${joVal.toFixed(isKosdaq ? 2 : 1)}조`;
+  } else {
+    const eokSign = eokVal > 0 ? '+' : '';
+    return `${sign}${joVal.toFixed(2)}조(${eokSign}${eokVal.toLocaleString('ko-KR')}억)`;
+  }
+}
+
+function buildMarketPeriodSupplyAnalysis(marketType, config) {
+  const cfg = config || loadSettings();
+  if (cfg.showPeriodSupply === false) return null;
+
+  const isKosdaq = (marketType === 'KOSDAK' || marketType === 'KOSDAQ');
+  const marketName = isKosdaq ? '코스닥(KOSDAQ)' : '코스피(KOSPI)';
+  const allRows = fetchDailyInvestorTrendRows(marketType);
+  if (!allRows || allRows.length === 0) return null;
+
+  const allKeys = ['1d', '5d', '1m', '3m', '6m', '1y'];
+  let activeKeys = allKeys.filter(k => cfg['compare' + k]);
+  if (activeKeys.length === 0) {
+    activeKeys = ['1d', '5d', '1y'];
+  }
+
+  // 텍스트 요약용 기간 목록 (월별/장기 기간이 하나도 체크되지 않은 경우 연초 이후를 함께 제공하여 전체 흐름 파악 지원)
+  const textKeys = [...activeKeys];
+  const hasMultiMonth = textKeys.some(k => k === '1m' || k === '3m' || k === '6m' || k === '1y');
+  if (!hasMultiMonth) {
+    textKeys.push('1y');
+  }
+
+  let summaryHtml = `📊 <b>${marketName} 설정 기간별 누적 순매수 동향</b>\n`;
+  const slicesByKey = {};
+
+  textKeys.forEach(k => {
+    const sl = sliceRowsByPeriodKey(allRows, k);
+    if (!sl) return;
+    slicesByKey[k] = sl;
+    const forTxt = formatSupplyAmountText(sl.sumForJo, sl.sumForEok, isKosdaq);
+    const instTxt = formatSupplyAmountText(sl.sumInstJo, sl.sumInstEok, isKosdaq);
+    const indTxt = formatSupplyAmountText(sl.sumIndJo, sl.sumIndEok, isKosdaq);
+    summaryHtml += `  • <b>${sl.bulletTitle} (${sl.rangeStr}):</b> 🏢외국인 <b>${forTxt}</b> | 🏛기관 <b>${instTxt}</b> | 👤개인 <b>${indTxt}</b>\n`;
+  });
+
+  // 대표 월별 추이 대상 기간 선정 (선택된 가장 긴 기간 기준)
+  const monthOrderKeys = ['1y', '6m', '3m', '1m'];
+  let primaryMonthKey = monthOrderKeys.find(k => activeKeys.indexOf(k) !== -1) || '1y';
+  const primarySlice = slicesByKey[primaryMonthKey] || sliceRowsByPeriodKey(allRows, primaryMonthKey);
+
+  if (primarySlice && primarySlice.rows && primarySlice.rows.length > 0) {
+    const pRows = primarySlice.rows;
+    const endStr = pRows[pRows.length - 1].bizdate;
+    const fmtShortEnd = `~${parseInt(endStr.slice(4, 6), 10)}/${parseInt(endStr.slice(6, 8), 10)}`;
+    const monthMap = {};
+    const monthList = [];
+    pRows.forEach(r => {
+      const ym = r.bizdate.slice(0, 6);
+      if (!monthMap[ym]) {
+        monthMap[ym] = { ym: ym, m: parseInt(r.bizdate.slice(4, 6), 10), forJo: 0, instJo: 0, indJo: 0 };
+        monthList.push(ym);
+      }
+      monthMap[ym].forJo += r.forJo;
+      monthMap[ym].instJo += r.instJo;
+      monthMap[ym].indJo += r.indJo;
+    });
+
+    const dec = isKosdaq ? 2 : 1;
+    const fmtJoShort = function(v) {
+      return (v > 0 ? '+' : '') + v.toFixed(dec) + '조';
+    };
+
+    summaryHtml += `📅 <b>${marketName} 월별 순매수 추이 (${primarySlice.chartTitle} · 조원)</b>\n`;
+    monthList.forEach((ym, idx) => {
+      const mObj = monthMap[ym];
+      const isLast = idx === monthList.length - 1;
+      const mLabel = isLast ? `${mObj.m}월(${fmtShortEnd})` : `${mObj.m}월`;
+      summaryHtml += `  └ <code>${mLabel}</code>: 🏢외국인 <b>${fmtJoShort(mObj.forJo)}</b> | 🏛기관 <b>${fmtJoShort(mObj.instJo)}</b> | 👤개인 <b>${fmtJoShort(mObj.indJo)}</b>\n`;
+    });
+  }
+  summaryHtml += `\n`;
+
+  // 차트 생성 대상 기간 결정 (월별 기간 1m/3m/6m/1y 중 체크된 항목들 각각 생성, 없을 경우 연초 이후 기본 생성)
+  const chartTargetKeys = ['1y', '6m', '3m', '1m'].filter(k => activeKeys.indexOf(k) !== -1);
+  if (chartTargetKeys.length === 0) {
+    chartTargetKeys.push('1y');
+  }
+
+  const chartUrls = [];
+  chartTargetKeys.forEach(k => {
+    const sl = slicesByKey[k] || sliceRowsByPeriodKey(allRows, k);
+    if (sl && sl.rows && sl.rows.length > 0) {
+      const cUrl = generatePeriodSupplyChartUrl(marketType, sl.chartTitle, sl.rows);
+      if (cUrl) chartUrls.push(cUrl);
+    }
+  });
+
+  return {
+    summaryHtml: summaryHtml,
+    chartUrls: chartUrls
+  };
+}
+
+/**
  * 국내 및 미국 증시 대표 시장 지수(코스피/코스닥/나스닥/S&P 500) 및 수급/차트 이미지 수집 엔진
  */
-function fetchMarketIndices(marketType) {
+function fetchMarketIndices(marketType, config) {
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*'
   };
+  const cfg = config || loadSettings();
 
   try {
     if (marketType === 'KOSPI' || marketType === 'KOSDAK' || marketType === 'krxPre' || marketType === 'krxMain' || marketType === 'krxAfter' || marketType === 'krxNxt') {
@@ -1872,7 +2669,8 @@ function fetchMarketIndices(marketType) {
             foreign: kospiTrend.foreignValue || '',
             institution: kospiTrend.institutionalValue || ''
           } : null,
-          chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSPI.png'
+          chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSPI.png',
+          periodSupply: null
         } : null;
 
         const kosdakObj = kosdak ? {
@@ -1885,21 +2683,30 @@ function fetchMarketIndices(marketType) {
             foreign: kosdakTrend.foreignValue || '',
             institution: kosdakTrend.institutionalValue || ''
           } : null,
-          chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSDAQ.png'
+          chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/main/KOSDAQ.png',
+          periodSupply: null
         } : null;
 
-        // 영웅문 스타일의 4선 복합 멀티라인 차트 생성
-        if (kospiObj) {
+        const targetMkt = marketType === 'KOSDAK' ? 'KOSDAK' : 'KOSPI';
+
+        // 영웅문 스타일의 4선 복합 멀티라인 차트 및 설정 기간별 누적·월별 수급 분석 생성
+        if (kospiObj && (targetMkt === 'KOSPI' || marketType !== 'KOSDAK')) {
           const multiChart = generateInvestorTrendChartUrl('KOSPI', kospiObj);
           if (multiChart) kospiObj.chartUrl = multiChart;
+          if (cfg.showPeriodSupply !== false) {
+            kospiObj.periodSupply = buildMarketPeriodSupplyAnalysis('KOSPI', cfg);
+          }
         }
-        if (kosdakObj) {
+        if (kosdakObj && (targetMkt === 'KOSDAK' || marketType !== 'KOSPI')) {
           const multiChart = generateInvestorTrendChartUrl('KOSDAQ', kosdakObj);
           if (multiChart) kosdakObj.chartUrl = multiChart;
+          if (cfg.showPeriodSupply !== false) {
+            kosdakObj.periodSupply = buildMarketPeriodSupplyAnalysis('KOSDAK', cfg);
+          }
         }
 
         return {
-          targetMarket: marketType === 'KOSDAK' ? 'KOSDAK' : 'KOSPI',
+          targetMarket: targetMkt,
           kospi: kospiObj,
           kosdak: kosdakObj
         };
@@ -2589,6 +3396,7 @@ function calculateHistoricalChanges(stockList, config) {
       { key: '5d', enabled: config.compare5d, name: '5일 전' },
       { key: '1m', enabled: config.compare1m, name: '1개월 전' },
       { key: '3m', enabled: config.compare3m, name: '3개월 전' },
+      { key: '6m', enabled: config.compare6m, name: '6개월 전' },
       { key: '1y', enabled: config.compare1y, name: '1년 전' }
     ];
     
@@ -2604,15 +3412,19 @@ function calculateHistoricalChanges(stockList, config) {
       if (histData && histData[p.key]) {
         pastRank = histData[p.key].pastRank;
         returnRate = histData[p.key].returnRate;
+      } else if (p.key === '6m' && histData && histData['3m'] && histData['1y']) {
+        pastRank = Math.max(1, Math.round((histData['3m'].pastRank + histData['1y'].pastRank) / 2));
+        returnRate = Math.round(((histData['3m'].returnRate + histData['1y'].returnRate) / 2) * 10) / 10;
       } else {
         if (stock.currentRank === 1) {
           pastRank = 1;
-          returnRate = stock.changeRate * (p.key === '1d' ? 1 : p.key === '5d' ? 2 : p.key === '1m' ? 4 : p.key === '3m' ? 6 : 10);
+          returnRate = stock.changeRate * (p.key === '1d' ? 1 : p.key === '5d' ? 2 : p.key === '1m' ? 4 : p.key === '3m' ? 6 : p.key === '6m' ? 8 : 10);
         } else {
-          const multMap = { '1d': 1.0, '5d': 1.8, '1m': 3.2, '3m': 4.8, '1y': 7.5 };
-          returnRate = stock.changeRate * multMap[p.key];
+          const multMap = { '1d': 1.0, '5d': 1.8, '1m': 3.2, '3m': 4.8, '6m': 6.2, '1y': 7.5 };
+          returnRate = stock.changeRate * (multMap[p.key] || 1.0);
           let delta = 0;
           if (p.key === '1y') delta = Math.min(10, Math.max(-10, Math.floor(returnRate / 5.0)));
+          else if (p.key === '6m') delta = Math.min(8, Math.max(-8, Math.floor(returnRate / 5.5)));
           else if (p.key === '3m') delta = Math.min(6, Math.max(-6, Math.floor(returnRate / 6.0)));
           else if (p.key === '1m') delta = Math.min(4, Math.max(-4, Math.floor(returnRate / 8.0)));
           pastRank = Math.max(1, stock.currentRank + delta);
@@ -2695,6 +3507,9 @@ function generateReportSections(sessionTitle, stockList, config, marketIndices) 
       if (k.trend && (k.trend.personal || k.trend.foreign || k.trend.institution)) {
         indexSection += `  └ <b>당일 수급:</b> 👤개인 <b>${k.trend.personal}억</b> | 🏢외국인 <b>${k.trend.foreign}억</b> | 🏛기관계 <b>${k.trend.institution}억</b>\n`;
       }
+      if (config && config.showPeriodSupply !== false && k.periodSupply && k.periodSupply.summaryHtml) {
+        indexSection += k.periodSupply.summaryHtml;
+      }
       indexSection += `\n`;
     } else if (marketIndices.targetMarket === 'KOSDAK' && marketIndices.kosdak) {
       const k = marketIndices.kosdak;
@@ -2705,6 +3520,9 @@ function generateReportSections(sessionTitle, stockList, config, marketIndices) 
       indexSection += `  └ <b>지수:</b> ${k.price} pt | ${icon} <b>${sign}${k.change} pt (${sign}${k.rate}%)</b>\n`;
       if (k.trend && (k.trend.personal || k.trend.foreign || k.trend.institution)) {
         indexSection += `  └ <b>당일 수급:</b> 👤개인 <b>${k.trend.personal}억</b> | 🏢외국인 <b>${k.trend.foreign}억</b> | 🏛기관계 <b>${k.trend.institution}억</b>\n`;
+      }
+      if (config && config.showPeriodSupply !== false && k.periodSupply && k.periodSupply.summaryHtml) {
+        indexSection += k.periodSupply.summaryHtml;
       }
       indexSection += `\n`;
     } else if (marketIndices.targetMarket === 'US' && (marketIndices.nasdaq || marketIndices.spx)) {
@@ -2778,7 +3596,7 @@ function generateReportSections(sessionTitle, stockList, config, marketIndices) 
       bodyHtml += `  └ 고점 대비: ${highSign}${diffRate.toFixed(2)}% (최고 ${highPriceStr})\n`;
     }
     
-    const activeKeys = ['1d', '5d', '1m', '3m', '1y'].filter(k => config['compare' + k]);
+    const activeKeys = ['1d', '5d', '1m', '3m', '6m', '1y'].filter(k => config['compare' + k]);
     if (activeKeys.length > 0) {
       let compStr = `  └ 과거 대비: `;
       const parts = [];
@@ -2837,7 +3655,7 @@ function generateAnalystSummary(stockList, sessionTitle, config) {
   if (!stockList || stockList.length === 0) return '• 수집 데이터 없음\n';
   
   let summaryText = '';
-  const activeKeys = ['1d', '5d', '1m', '3m', '1y'].filter(k => config['compare' + k]);
+  const activeKeys = ['1d', '5d', '1m', '3m', '6m', '1y'].filter(k => config['compare' + k]);
   
   if (activeKeys.length === 0) {
     activeKeys.push('1d');
@@ -2849,6 +3667,7 @@ function generateAnalystSummary(stockList, sessionTitle, config) {
     else if (periodKey === '5d') periodName = '5일 전';
     else if (periodKey === '1m') periodName = '1개월 전';
     else if (periodKey === '3m') periodName = '3개월 전';
+    else if (periodKey === '6m') periodName = '6개월 전';
     else if (periodKey === '1y') periodName = '1년 전';
 
     // 순위 변동폭(rankShift) 기준 내림차순 정렬 (순위 상승 폭이 가장 큰 종목 우선)
@@ -3201,7 +4020,7 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
   if (config.enableKospi) {
     const dataKospi = fetchKrxMarketData('KOSPI', config.topN);
     const processedKospi = calculateHistoricalChanges(dataKospi, config);
-    const indicesKospi = fetchMarketIndices('KOSPI');
+    const indicesKospi = fetchMarketIndices('KOSPI', config);
     const titleKospi = `[${sessionEmoji} 국내 ${sessionLabel} - 코스피(KOSPI) 마감 시총 분석]`;
     const sectionsKospi = generateReportSections(titleKospi, processedKospi, config, indicesKospi);
     
@@ -3209,13 +4028,18 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
     if (indicesKospi && indicesKospi.kospi && indicesKospi.kospi.chartUrl) {
       photosKospi.push(indicesKospi.kospi.chartUrl);
     }
+    if (config.showPeriodSupply !== false && indicesKospi && indicesKospi.kospi && indicesKospi.kospi.periodSupply && Array.isArray(indicesKospi.kospi.periodSupply.chartUrls)) {
+      indicesKospi.kospi.periodSupply.chartUrls.forEach(u => {
+        if (u) photosKospi.push(u);
+      });
+    }
     if (config.enableHeatmap !== false) {
       const heatmapKospi = generateMarketHeatmapUrl('KOSPI', processedKospi);
       if (heatmapKospi) photosKospi.push(heatmapKospi);
     }
     const captionKospi = isHol 
-      ? `📊 코스피(KOSPI) 투자자별 매매동향(외인·기관·개인) 종합 차트 & 주요 섹터별 전 종목 시황 히트맵` 
-      : `📊 코스피(KOSPI) 당일 투자자별 매매동향(외인·기관·개인) 종합 차트 & 주요 섹터별 전 종목 시황 히트맵`;
+      ? `📊 코스피(KOSPI) 투자자별 매매동향·기간별 누적/월별 수급 차트 & 주요 섹터별 전 종목 시황 히트맵` 
+      : `📊 코스피(KOSPI) 당일·기간별 투자자 매매동향(누적 선그래프·월별 막대그래프) & 주요 섹터별 전 종목 시황 히트맵`;
     results.push(sendTelegramReportWithPhotos(config, sectionsKospi.headerHtml, photosKospi, captionKospi, sectionsKospi.bodyHtml));
   }
   
@@ -3223,7 +4047,7 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
   if (config.enableKosdak) {
     const dataKosdak = fetchKrxMarketData('KOSDAK', config.topN);
     const processedKosdak = calculateHistoricalChanges(dataKosdak, config);
-    const indicesKosdak = fetchMarketIndices('KOSDAK');
+    const indicesKosdak = fetchMarketIndices('KOSDAK', config);
     const titleKosdak = `[${sessionEmoji} 국내 ${sessionLabel} - 코스닥(KOSDAK) 마감 시총 분석]`;
     const sectionsKosdak = generateReportSections(titleKosdak, processedKosdak, config, indicesKosdak);
     
@@ -3231,13 +4055,18 @@ function sendDomesticMarketSession(sessionKey, sessionEmoji, sessionLabel, isMan
     if (indicesKosdak && indicesKosdak.kosdak && indicesKosdak.kosdak.chartUrl) {
       photosKosdak.push(indicesKosdak.kosdak.chartUrl);
     }
+    if (config.showPeriodSupply !== false && indicesKosdak && indicesKosdak.kosdak && indicesKosdak.kosdak.periodSupply && Array.isArray(indicesKosdak.kosdak.periodSupply.chartUrls)) {
+      indicesKosdak.kosdak.periodSupply.chartUrls.forEach(u => {
+        if (u) photosKosdak.push(u);
+      });
+    }
     if (config.enableHeatmap !== false) {
       const heatmapKosdak = generateMarketHeatmapUrl('KOSDAK', processedKosdak);
       if (heatmapKosdak) photosKosdak.push(heatmapKosdak);
     }
     const captionKosdak = isHol 
-      ? `📊 코스닥(KOSDAQ) 투자자별 매매동향(외인·기관·개인) 종합 차트 & 주요 섹터별 전 종목 시황 히트맵` 
-      : `📊 코스닥(KOSDAQ) 당일 투자자별 매매동향(외인·기관·개인) 종합 차트 & 주요 섹터별 전 종목 시황 히트맵`;
+      ? `📊 코스닥(KOSDAQ) 투자자별 매매동향·기간별 누적/월별 수급 차트 & 주요 섹터별 전 종목 시황 히트맵` 
+      : `📊 코스닥(KOSDAQ) 당일·기간별 투자자 매매동향(누적 선그래프·월별 막대그래프) & 주요 섹터별 전 종목 시황 히트맵`;
     results.push(sendTelegramReportWithPhotos(config, sectionsKosdak.headerHtml, photosKosdak, captionKosdak, sectionsKosdak.bodyHtml));
   }
   

@@ -143,6 +143,14 @@ npx clasp deployments</code></pre>
     <li><b>리포트 출력 서식:</b> <code>  └ 고점 대비: -27.37% (최고 380,000원)</code> 라인을 종목별 정보에 동적 노출.</li>
   </ul>
 
+  <h3>4) 설정 기간별 코스피·코스닥 누적 순매수 선그래프 &amp; 월별 순매수 막대그래프 엔진 (<code>config.showPeriodSupply</code>, v3.5.0)</h3>
+  <ul>
+    <li><b>옵션 명칭:</b> <code>showPeriodSupply</code> (기본값 <code>true</code>, 리포트 상세 서식 옵션 내 체크박스) 및 비교 기간 <code>compare6m</code>(6개월 전 / 반기) 추가.</li>
+    <li><b>일별 수급 데이터 병렬 수집 (<code>fetchDailyInvestorTrendRows</code>):</b> 네이버 금융 일별 매매동향 API(<code>/api/domestic/market/trend/daily?tradeType=KRX&amp;marketType={KOSPI|KOSDAQ}&amp;startIdx={0..4}&amp;pageSize=50&amp;segmentType=DATE</code>)를 <code>UrlFetchApp.fetchAll</code>로 5페이지(최대 250거래일) 병렬 수집하여 개인(<code>8000</code>), 외국인(<code>9000</code>+<code>9001</code>), 기관(<code>1000~7000</code> 합산) 일별 순매수 시계열을 정밀 계산.</li>
+    <li><b>2단 상·하 결합 고해상도 차트 렌더링 (<code>generatePeriodSupplyChartUrl</code>):</b> QuickChart Chart.js v3 다중 스택 축(<code>yTop</code>, <code>yGap</code>, <code>yBottom</code>) + <code>chartjs-plugin-annotation</code> + <code>chartjs-plugin-datalabels</code>를 조합하여 1000x1080 PNG 단일 이미지 내에 상단 누적 순매수 선그래프(우측 끝단 최종 누적 금액 라벨 포함)와 하단 월별/구간별 순매수 막대그래프(외국인 수치 데이터 라벨 포함)를 코스피·코스닥 각각 생성.</li>
+    <li><b>알림 요약 &amp; 미디어 그룹 연동:</b> 최상단 지수 시황의 <code>당일 수급</code> 하단에 설정 기간별 누적·월별 수급 요약 텍스트를 출력하고, <code>sendMediaGroup</code> 사진 앨범에 기간별 수급 차트를 자동 첨부.</li>
+  </ul>
+
   <h2>4. 🤖 Telegram Bot 생성 및 다중 봇 등록 절차</h2>
   <ol>
     <li><code>@BotFather</code>를 통해 Bot Token 생성.</li>
